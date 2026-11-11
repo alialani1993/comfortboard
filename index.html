@@ -245,6 +245,10 @@ body.has-bar .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script type="module">
+/* ============================================================
+   1. PASTE YOUR FIREBASE CONFIG HERE
+   (Firebase console → Project settings → Your apps → Web app)
+   ============================================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyBB4fzVG9PYr9nZAsDcr7d5Sl-nWqMnxvc",
   authDomain: "comfortboard-98d18.firebaseapp.com",
@@ -252,8 +256,7 @@ const firebaseConfig = {
   storageBucket: "comfortboard-98d18.firebasestorage.app",
   messagingSenderId: "990552364451",
   appId: "1:990552364451:web:e1f4b819a0477d056b7616"
-};
-/* ============================================================ */
+};/* ============================================================ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
