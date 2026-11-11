@@ -1,0 +1,139 @@
+rules_version = '2';
+
+// Comfort Board security rules.
+// - Anyone who opens the page (signed in anonymously in the background) can VIEW the board.
+// - Devices that entered the team passcode can EDIT: add players, move champions, remove players.
+// - Devices that entered the owner passcode are OWNERS: everything editors can do, plus tier
+//   labels, clearing history and resetting boards.
+// - Both passcodes live in config/team, which no browser can read. Set them in the Firebase console.
+// - Changing a passcode there locks out every device using it until it re-enters the new one.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function cfg() {
+      return get(/databases/$(database)/documents/config/team).data;
+    }
+
+    function memberPath() {
+      return /databases/$(database)/documents/members/$(request.auth.uid);
+    }
+
+    function member() {
+      return get(memberPath()).data;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && exists(memberPath())
+        && cfg().get('ownerPasscode', '') != ''
+        && member().get('ownerCode', null) == cfg().get('ownerPasscode', '');
+    }
+
+    function isEditor() {
+      return signedIn()
+        && exists(memberPath())
+        && ((cfg().get('passcode', '') != '' && member().get('code', null) == cfg().get('passcode', ''))
+            || isOwner());
+    }
+
+    function playerExists(pid) {
+      return exists(/databases/$(database)/documents/players/$(pid));
+    }
+
+    function validMember(d) {
+      return d.keys().hasOnly(['code', 'ownerCode', 'name', 'joinedAt'])
+        && ('code' in d || 'ownerCode' in d)
+        && (!('code' in d) || (cfg().get('passcode', '') != '' && d.code == cfg().get('passcode', '')))
+        && (!('ownerCode' in d) || (cfg().get('ownerPasscode', '') != '' && d.ownerCode == cfg().get('ownerPasscode', '')))
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 24;
+    }
+
+    function validTierList(list) {
+      return list is list && list.size() <= 200;
+    }
+
+    function validPlayer(d) {
+      return d.keys().hasOnly(['name', 'role', 'tiers', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 24
+        && d.role is string && d.role.size() <= 12
+        && d.tiers is map
+        && d.tiers.keys().hasOnly(['S', 'A', 'B', 'C', 'D'])
+        && validTierList(d.tiers.get('S', []))
+        && validTierList(d.tiers.get('A', []))
+        && validTierList(d.tiers.get('B', []))
+        && validTierList(d.tiers.get('C', []))
+        && validTierList(d.tiers.get('D', []));
+    }
+
+    function validMove(d) {
+      return d.keys().hasOnly(['player', 'champ', 'from', 'to', 'by', 'byName', 'at'])
+        && d.player is string
+        && d.champ is string && d.champ.size() <= 24
+        && (d.from == null || d.from in ['S', 'A', 'B', 'C', 'D'])
+        && (d.to == null || d.to in ['S', 'A', 'B', 'C', 'D'])
+        && d.by == request.auth.uid
+        && d.byName is string && d.byName.size() <= 24
+        && d.at is number;
+    }
+
+    function validTierLabel(t) {
+      return t is map
+        && t.keys().hasOnly(['label', 'cap'])
+        && t.get('label', '') is string && t.get('label', '').size() <= 4
+        && t.get('cap', '') is string && t.get('cap', '').size() <= 24;
+    }
+
+    function validSettings(d) {
+      return d.keys().hasOnly(['tiers', 'updatedAt', 'updatedBy'])
+        && d.tiers is map
+        && d.tiers.keys().hasOnly(['S', 'A', 'B', 'C', 'D'])
+        && validTierLabel(d.tiers.get('S', {}))
+        && validTierLabel(d.tiers.get('A', {}))
+        && validTierLabel(d.tiers.get('B', {}))
+        && validTierLabel(d.tiers.get('C', {}))
+        && validTierLabel(d.tiers.get('D', {}));
+    }
+
+    // The passcodes. Never readable or writable from a browser.
+    match /config/{docId} {
+      allow read, write: if false;
+    }
+
+    // One document per unlocked device. Writing it requires a correct passcode.
+    match /members/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && validMember(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Owner-controlled board settings (tier letters and subtitles).
+    match /settings/{docId} {
+      allow read: if signedIn();
+      allow write: if isOwner() && docId == 'board' && validSettings(request.resource.data);
+    }
+
+    match /players/{playerId} {
+      allow read: if signedIn();
+      allow create, update: if isEditor() && validPlayer(request.resource.data);
+      allow delete: if isEditor();
+    }
+
+    // History. Editors add entries. Only the owner can clear history, except that an editor
+    // can delete the leftover entries of a player that has already been removed.
+    match /moves/{moveId} {
+      allow read: if signedIn();
+      allow create: if isEditor() && validMove(request.resource.data);
+      allow update: if false;
+      allow delete: if isOwner() || (isEditor() && !playerExists(resource.data.player));
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

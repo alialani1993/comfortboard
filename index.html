@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comfort Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: roster tabs across the top; selected player's tier board on the left, movement log on the right; stacks on phones. */
+:root {
+  --bg: #e9edf3; --surface: #ffffff; --surface-2: #f3f5f9; --ink: #131a27; --muted: #5a6477; --line: #d3d9e3;
+  --accent: #a87b22; --accent-ink: #ffffff; --accent-soft: #f4ead3;
+  --up-ink: #1f7d48; --down-ink: #c03f3f;
+  --tS: #c48f22; --tA: #2f8f80; --tB: #3f6fbf; --tC: #7d63ae; --tD: #7b8291; --tier-ink: #ffffff;
+  --shadow: 0 1px 2px rgba(19,26,39,.06), 0 6px 20px rgba(19,26,39,.07);
+  --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e131c; --surface: #161d29; --surface-2: #1c2433; --ink: #e6eaf1; --muted: #8e98aa; --line: #283245;
+    --accent: #d6aa52; --accent-ink: #1a1408; --accent-soft: #3a2f18;
+    --up-ink: #4fc282; --down-ink: #ec6d6d;
+    --tS: #c99a35; --tA: #349c8c; --tB: #4a7bcb; --tC: #8a70bb; --tD: #6d7484;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.45; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(20px + env(safe-area-inset-top, 0px)) 120px;
+  display: grid; gap: 16px;
+}
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.top h1 { font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: .02em; text-transform: uppercase; margin: 0; }
+.top h1 span { color: var(--accent); }
+.sub { margin: 4px 0 0; color: var(--muted); }
+.top-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.status { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.live .dot { background: var(--up-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up-ink) 25%, transparent); }
+.status.warn .dot { background: var(--down-ink); }
+.who-me { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.who-me b { color: var(--ink); font-weight: 600; }
+
+.roster-wrap { overflow-x: auto; margin-inline: -4px; padding: 4px; }
+.roster { display: flex; gap: 6px; width: max-content; }
+.tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; }
+.tab:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tab .role { font-family: var(--f-display); font-weight: 700; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.tab .count { font-family: var(--f-mono); font-size: 11px; opacity: .65; font-variant-numeric: tabular-nums; }
+.tab.add { border-style: dashed; color: var(--muted); background: transparent; }
+.tab.add:hover { color: var(--ink); }
+
+.notice { padding: 10px 14px; border-radius: 8px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+
+.main { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 920px) { .main.split { grid-template-columns: minmax(0, 1fr) 330px; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); min-width: 0; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.who { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.who h2 { font-family: var(--f-display); font-weight: 700; font-size: 28px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
+.pill { font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); font-weight: 500; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.05); }
+.btn.danger { color: var(--down-ink); }
+.btn.danger.solid { background: var(--down-ink); color: #fff; border-color: var(--down-ink); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); background: var(--surface-2); }
+.btn.small { padding: 4px 9px; font-size: 13px; }
+
+.addchamp { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.addchamp input[type="text"] { flex: 1 1 180px; min-width: 0; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); position: relative; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 7px 10px; font-family: var(--f-display); font-weight: 700; font-size: 15px; cursor: pointer; border-left: 1px solid var(--line); min-width: 34px; text-align: center; }
+.seg label:first-of-type { border-left: 0; }
+.seg input:checked + label { background: var(--tc); color: var(--tier-ink); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.tier { display: grid; grid-template-columns: 64px minmax(0, 1fr); border-bottom: 1px solid var(--line); min-height: 64px; }
+.tier:last-child { border-bottom: 0; }
+.tier-label { background: var(--tc); color: var(--tier-ink); display: grid; place-content: center; text-align: center; padding: 6px 4px; }
+.tier-label b { font-family: var(--f-display); font-weight: 700; font-size: 30px; line-height: 1; }
+.tier-label small { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; opacity: .9; line-height: 1.15; margin-top: 2px; }
+.zone { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; align-content: flex-start; transition: background .15s; min-width: 0; }
+.zone.over { background: color-mix(in srgb, var(--tc) 14%, transparent); }
+.zone.target { cursor: pointer; background: color-mix(in srgb, var(--tc) 7%, transparent); }
+.zone.target:hover { background: color-mix(in srgb, var(--tc) 16%, transparent); }
+.zone .empty { color: var(--muted); opacity: .7; font-size: 12px; align-self: center; }
+
+.chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 9px 4px 4px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); max-width: 100%; transition: box-shadow .12s, border-color .12s; }
+.chip:hover { border-color: color-mix(in srgb, var(--tc) 60%, var(--line)); }
+.chip.is-sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.chip.dragging { opacity: .4; }
+.chip[draggable="true"] { cursor: grab; }
+.mono { width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 13px; background: hsl(var(--h) 45% 42%); color: #fff; flex: none; }
+.cname { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trend { font-size: 10px; line-height: 1; flex: none; }
+.trend.up { color: var(--up-ink); }
+.trend.down { color: var(--down-ink); }
+.trend.new { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+.hist-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.hist-head h3 { font-family: var(--f-display); font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: .04em; margin: 0; }
+.mini-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.mini-seg button { border: 0; background: transparent; padding: 4px 10px; font-size: 12px; color: var(--muted); }
+.mini-seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.hist-list { list-style: none; margin: 0; padding: 6px 0; max-height: 640px; overflow-y: auto; }
+.hist-list li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 9px 16px; }
+.hist-list li + li { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.badge { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.badge.up { background: color-mix(in srgb, var(--up-ink) 16%, transparent); color: var(--up-ink); }
+.badge.down { background: color-mix(in srgb, var(--down-ink) 15%, transparent); color: var(--down-ink); }
+.badge.add { background: var(--accent-soft); color: var(--accent); font-size: 15px; }
+.badge.rm { background: var(--surface-2); color: var(--muted); font-size: 15px; }
+.hl { min-width: 0; }
+.hl .line1 { overflow-wrap: anywhere; }
+.hl .line2 { color: var(--muted); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
+.hl time { font-family: var(--f-mono); font-size: 11px; }
+.tp { display: inline-block; font-family: var(--f-display); font-weight: 700; font-size: 13px; min-width: 18px; text-align: center; padding: 0 4px; border-radius: 3px; background: var(--tc); color: var(--tier-ink); line-height: 18px; vertical-align: 1px; }
+.hist-empty { padding: 20px 16px; color: var(--muted); display: block !important; }
+
+.team-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); }
+.card { display: grid; overflow: hidden; cursor: pointer; }
+.card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 12px 14px 10px; }
+.card-head h3 { font-family: var(--f-display); font-weight: 700; font-size: 21px; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
+.card-rows { display: grid; border-top: 1px solid var(--line); }
+.crow { display: grid; grid-template-columns: minmax(26px, max-content) minmax(0, 1fr); border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.crow:last-child { border-bottom: 0; }
+.crow b { background: var(--tc); color: var(--tier-ink); font-family: var(--f-display); font-size: 15px; display: grid; place-items: center; padding: 0 5px; }
+.crow span { padding: 5px 8px; font-size: 12.5px; overflow-wrap: anywhere; }
+.crow span.none { color: var(--muted); opacity: .6; }
+
+.empty-state { padding: 32px 24px; display: grid; gap: 16px; justify-items: start; }
+.empty-state h2 { font-family: var(--f-display); font-weight: 700; font-size: 30px; margin: 0; text-transform: uppercase; }
+.empty-state p { margin: 0; color: var(--muted); max-width: 56ch; }
+.empty-state code { font-family: var(--f-mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.legend { display: grid; gap: 6px; width: 100%; max-width: 420px; }
+.legend div { display: grid; grid-template-columns: minmax(34px, max-content) 1fr; align-items: center; gap: 10px; }
+.legend b { background: var(--tc); color: var(--tier-ink); font-family: var(--f-display); font-size: 18px; text-align: center; border-radius: 5px; line-height: 30px; padding: 0 6px; }
+
+.field { display: grid; gap: 4px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.field input, .field select { padding: 9px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); width: 100%; }
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; width: 100%; }
+.form-row .field { flex: 1 1 160px; min-width: 0; }
+.form-err { color: var(--down-ink); margin: 0; font-size: 13px; }
+
+.overlay { position: fixed; inset: 0; background: color-mix(in srgb, #0b0f17 45%, transparent); display: grid; place-items: center; z-index: 40;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.dialog { width: min(440px, 100%); padding: 20px; display: grid; gap: 14px; }
+.dialog h2 { font-family: var(--f-display); font-weight: 700; font-size: 24px; margin: 0; text-transform: uppercase; }
+.dialog p { margin: 0; color: var(--muted); }
+.row-end { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.row-split { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+
+.actionbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0,0,0,.12);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.ab-inner { max-width: 1240px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ab-name { font-weight: 600; display: flex; align-items: center; gap: 8px; margin-right: auto; min-width: 0; }
+.ab-hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+.ab-tiers { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.ab-tiers button { min-width: 38px; padding: 0 8px; height: 34px; border-radius: 6px; border: 0; background: var(--tc); color: var(--tier-ink); font-family: var(--f-display); font-weight: 700; font-size: 17px; }
+.ab-tiers button:disabled { opacity: .3; cursor: default; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 50; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 8px; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+.toast button { background: transparent; border: 0; color: var(--accent); font-weight: 600; padding: 0; }
+body.has-bar .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.loading { padding: 40px 24px; color: var(--muted); }
+.tier-label b.long { font-size: 20px; }
+.tier-label b.xlong { font-size: 15px; }
+
+/* owner settings */
+.settings { display: grid; gap: 16px; }
+.set-sec { padding: 18px; display: grid; gap: 14px; }
+.set-sec h2 { font-family: var(--f-display); font-weight: 700; font-size: 22px; text-transform: uppercase; letter-spacing: .03em; margin: 0; }
+.set-sec > p { margin: 0; color: var(--muted); max-width: 64ch; }
+.tier-edit { display: grid; gap: 8px; }
+.te-row { display: grid; grid-template-columns: 40px 90px minmax(0, 1fr); gap: 10px; align-items: center; }
+.te-row .sw { height: 36px; border-radius: 6px; background: var(--tc); color: var(--tier-ink); display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 16px; overflow: hidden; }
+.te-row input { padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); width: 100%; min-width: 0; }
+.te-row input.lbl { font-family: var(--f-display); font-weight: 700; font-size: 16px; text-align: center; }
+.te-head { display: grid; grid-template-columns: 40px 90px minmax(0, 1fr); gap: 10px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.reset-list { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.rl-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
+.rl-row + .rl-row { border-top: 1px solid var(--line); }
+.rl-row .rl-name { margin-right: auto; min-width: 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.rl-row .rl-name b { font-weight: 600; overflow-wrap: anywhere; }
+.rl-row .rl-meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rl-all { background: var(--surface-2); }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.progress { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+@media (max-width: 520px) { .te-row, .te-head { grid-template-columns: 36px 70px minmax(0, 1fr); } }
+
+@media (max-width: 520px) {
+  .top h1 { font-size: 28px; }
+  .tier { grid-template-columns: 50px minmax(0, 1fr); }
+  .tier-label small { display: none; }
+  .who h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Comfort <span>Board</span></h1>
+      <p class="sub">Champion comfort tiers for every player on the roster, with a log of every move.</p>
+    </div>
+    <div class="top-right">
+      <div id="me" class="who-me"></div>
+      <div id="status" class="status"><span class="dot"></span><span id="statusText">Connecting</span></div>
+    </div>
+  </header>
+  <nav class="roster-wrap" aria-label="Players"><div id="roster" class="roster" role="tablist"></div></nav>
+  <div id="notice" class="notice" hidden></div>
+  <main id="main" class="main"></main>
+</div>
+<div id="actionbar" class="actionbar" hidden></div>
+<div id="overlay" class="overlay" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyBB4fzVG9PYr9nZAsDcr7d5Sl-nWqMnxvc",
+  authDomain: "comfortboard-98d18.firebaseapp.com",
+  projectId: "comfortboard-98d18",
+  storageBucket: "comfortboard-98d18.firebasestorage.app",
+  messagingSenderId: "990552364451",
+  appId: "1:990552364451:web:e1f4b819a0477d056b7616"
+};
+/* ============================================================ */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, doc, onSnapshot, query, orderBy, limit, where,
+  getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const TIERS = [
+  { k: "S", cap: "Pocket pick" }, { k: "A", cap: "Comfortable" }, { k: "B", cap: "Playable" },
+  { k: "C", cap: "Practicing" }, { k: "D", cap: "Last resort" },
+];
+const RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
+const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support", "Flex"];
+const ROLE_ABBR = { Top: "Top", Jungle: "Jg", Mid: "Mid", Bot: "Bot", Support: "Sup", Flex: "Flex" };
+const CHAMPS = ["Aatrox","Ahri","Akali","Akshan","Alistar","Ambessa","Amumu","Anivia","Annie","Aphelios","Ashe","Aurelion Sol","Aurora","Azir","Bard","Bel'Veth","Blitzcrank","Brand","Braum","Briar","Caitlyn","Camille","Cassiopeia","Cho'Gath","Corki","Darius","Diana","Dr. Mundo","Draven","Ekko","Elise","Evelynn","Ezreal","Fiddlesticks","Fiora","Fizz","Galio","Gangplank","Garen","Gnar","Gragas","Graves","Gwen","Hecarim","Heimerdinger","Hwei","Illaoi","Irelia","Ivern","Janna","Jarvan IV","Jax","Jayce","Jhin","Jinx","K'Sante","Kai'Sa","Kalista","Karma","Karthus","Kassadin","Katarina","Kayle","Kayn","Kennen","Kha'Zix","Kindred","Kled","Kog'Maw","LeBlanc","Lee Sin","Leona","Lillia","Lissandra","Lucian","Lulu","Lux","Malphite","Malzahar","Maokai","Master Yi","Mel","Milio","Miss Fortune","Mordekaiser","Morgana","Naafiri","Nami","Nasus","Nautilus","Neeko","Nidalee","Nilah","Nocturne","Nunu & Willump","Olaf","Orianna","Ornn","Pantheon","Poppy","Pyke","Qiyana","Quinn","Rakan","Rammus","Rek'Sai","Rell","Renata Glasc","Renekton","Rengar","Riven","Rumble","Ryze","Samira","Sejuani","Senna","Seraphine","Sett","Shaco","Shen","Shyvana","Singed","Sion","Sivir","Skarner","Smolder","Sona","Soraka","Swain","Sylas","Syndra","Tahm Kench","Taliyah","Talon","Taric","Teemo","Thresh","Tristana","Trundle","Tryndamere","Twisted Fate","Twitch","Udyr","Urgot","Varus","Vayne","Veigar","Vel'Koz","Vex","Vi","Viego","Viktor","Vladimir","Volibear","Warwick","Wukong","Xayah","Xerath","Xin Zhao","Yasuo","Yone","Yorick","Yunara","Yuumi","Zac","Zed","Zeri","Ziggs","Zilean","Zoe","Zyra"];
+
+const S = {
+  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null,
+  configMissing: false, error: null, loaded: false, stalled: false, gotPlayers: false,
+  players: new Map(), order: [], moves: [],
+  view: null, sel: null, drag: null, histScope: "player", addTier: "B",
+};
+let built = null;
+let unsubs = [];
+const $ = (id) => document.getElementById(id);
+
+/* ---------- helpers ---------- */
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "text") e.textContent = v;
+    else if (k === "dataset") Object.assign(e.dataset, v);
+    else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(String(c))); }
+  return e;
+}
+const tierVar = (k) => `--tc: var(--t${k})`;
+function hue(s) { let x = 0; for (const ch of s) x = (x * 31 + ch.charCodeAt(0)) >>> 0; return x % 360; }
+function initials(n) {
+  const w = n.replace(/[^A-Za-z ]/g, " ").split(/\s+/).filter(Boolean).filter(x => x !== "IV");
+  if (w.length >= 2) return (w[0][0] + w[1][0]).toUpperCase();
+  const s = w[0] || "?"; return s[0].toUpperCase() + (s[1] || "").toLowerCase();
+}
+const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+function canonical(raw) {
+  const hit = CHAMPS.find(c => norm(c) === norm(raw)); if (hit) return hit;
+  const t = raw.trim().replace(/\s+/g, " ").slice(0, 24);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function rel(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return "just now"; if (m < 60) return m + "m ago";
+  const hr = Math.round(m / 60); if (hr < 24) return hr + "h ago";
+  const dy = Math.round(hr / 24); if (dy < 7) return dy + "d ago";
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+function tiersOf(p) { const t = (p && p.tiers) || {}; const o = {}; for (const { k } of TIERS) o[k] = Array.isArray(t[k]) ? t[k].slice() : []; return o; }
+function findTier(p, champ) { const t = tiersOf(p); for (const { k } of TIERS) if (t[k].includes(champ)) return k; return null; }
+function champCount(p) { const t = tiersOf(p); return TIERS.reduce((n, { k }) => n + t[k].length, 0); }
+function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+const canEdit = () => (S.editor || S.owner) && !!S.db;
+const DEFAULT_CAP = Object.fromEntries(TIERS.map(t => [t.k, t.cap]));
+function lab(k) { const v = S.tierCfg[k] && S.tierCfg[k].label; return (v && v.trim()) || k; }
+function capOf(k) { const c = S.tierCfg[k]; return c && typeof c.cap === "string" ? c.cap : DEFAULT_CAP[k]; }
+function labEl(k) { const l = lab(k); return h("b", { class: l.length >= 4 ? "xlong" : l.length === 3 ? "long" : null, text: l }); }
+
+/* ---------- writes ---------- */
+let chain = Promise.resolve();
+function enqueue(fn) { chain = chain.then(fn).catch(onWriteError); return chain; }
+function onWriteError(e) {
+  console.error(e);
+  if (e && e.code === "permission-denied") {
+    S.editor = false; S.owner = false; built = null; S.sel = null; if (S.view === "settings") S.view = "team"; render();
+    toast("Editing access was refused. The passcode may have changed, so unlock again.");
+  } else toast("That change didn't save. Check your connection and try again.");
+}
+function moveChamp(pid, champ, to, before) {
+  const p = S.players.get(pid); if (!p || !canEdit()) return;
+  const orig = tiersOf(p); const t = tiersOf(p); const from = findTier(p, champ);
+  if (from) t[from] = t[from].filter(c => c !== champ);
+  if (to) { const arr = t[to]; const i = before ? arr.indexOf(before) : -1; if (i < 0) arr.push(champ); else arr.splice(i, 0, champ); }
+  if (from === to && JSON.stringify(t[to]) === JSON.stringify(orig[to])) return;
+  const patch = { updatedAt: Date.now(), updatedBy: S.myId };
+  if (from) patch["tiers." + from] = t[from];
+  if (to) patch["tiers." + to] = t[to];
+  const batch = writeBatch(S.db);
+  batch.update(doc(S.db, "players", pid), patch);
+  if (from !== to) batch.set(doc(collection(S.db, "moves")), { player: pid, champ, from: from || null, to: to || null, by: S.myId, byName: S.myName || "", at: Date.now() });
+  enqueue(() => batch.commit());
+}
+function removeChamp(pid, champ) {
+  const from = findTier(S.players.get(pid), champ); if (!from) return;
+  moveChamp(pid, champ, null);
+  toast(`${champ} removed from ${lab(from)}.`, "Undo", () => moveChamp(pid, champ, from));
+}
+function addPlayer(name, role) {
+  if (!canEdit()) return;
+  const ref = doc(collection(S.db, "players"));
+  S.view = ref.id; store("cb-view", ref.id);
+  enqueue(() => setDoc(ref, { name, role, tiers: { S: [], A: [], B: [], C: [], D: [] }, createdAt: Date.now(), createdBy: S.myId, updatedAt: Date.now(), updatedBy: S.myId }));
+  render();
+}
+function editPlayer(pid, name, role) { enqueue(() => updateDoc(doc(S.db, "players", pid), { name, role, updatedAt: Date.now(), updatedBy: S.myId })); }
+function deletePlayer(pid) {
+  const db = S.db;
+  // The player goes first: the rules only let non-owner editors delete history for a player that no longer exists.
+  enqueue(async () => {
+    await deleteDoc(doc(db, "players", pid));
+    const snap = await getDocs(query(collection(db, "moves"), where("player", "==", pid)));
+    await deleteRefs(snap.docs.map(d => d.ref));
+  });
+  S.view = "team"; S.sel = null; render();
+}
+function downloadBackup() {
+  const data = { exportedAt: new Date().toISOString(), players: S.order.map(id => ({ id, ...S.players.get(id) })), moves: S.moves };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = h("a", { href: URL.createObjectURL(blob), download: `comfort-board-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ---------- toast ---------- */
+let toastTimer = null;
+function toast(msg, label, fn) {
+  const t = $("toast"); t.replaceChildren(h("span", { text: msg }));
+  if (label) t.append(h("button", { type: "button", text: label, onclick: () => { t.hidden = true; fn(); } }));
+  t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+}
+
+/* ---------- render ---------- */
+function render() { renderStatus(); renderMe(); renderRoster(); renderNotice(); renderMain(); renderActionBar(); }
+function renderStatus() {
+  const el = $("status"), tx = $("statusText"); el.className = "status";
+  if (S.configMissing) { el.classList.add("warn"); tx.textContent = "Not set up"; }
+  else if (S.error) { el.classList.add("warn"); tx.textContent = "Connection lost"; }
+  else if (S.stalled) { el.classList.add("warn"); tx.textContent = "Can't reach the board yet"; }
+  else if (S.loaded) { el.classList.add("live"); tx.textContent = "Live"; }
+  else tx.textContent = "Connecting";
+}
+function renderMe() {
+  const el = $("me"); el.replaceChildren();
+  if (S.configMissing || !S.myId) return;
+  if (canEdit()) {
+    el.append(h("span", {}, S.owner ? "Owner: " : "Editing as ", h("b", { text: S.myName || "you" })));
+    el.append(h("button", { class: "btn small" + (S.owner ? "" : " ghost"), type: "button", text: "Owner settings", "aria-pressed": S.view === "settings" ? "true" : null,
+      onclick: () => S.owner ? go(S.view === "settings" ? "team" : "settings") : openUnlockDialog("owner") }));
+    el.append(h("button", { class: "btn ghost small", type: "button", text: "Backup", title: "Download every player and the full history as a JSON file", onclick: downloadBackup }),
+      h("button", { class: "btn ghost small", type: "button", text: "Lock", title: "Stop editing on this device", onclick: lockDevice }));
+  } else el.append(
+    h("button", { class: "btn ghost small", type: "button", text: "Owner", onclick: () => openUnlockDialog("owner") }),
+    h("button", { class: "btn primary small", type: "button", text: "Unlock editing", onclick: () => openUnlockDialog("editor") }));
+}
+function renderNotice() {
+  const n = $("notice"); n.replaceChildren();
+  let msg = "", action = null;
+  if (S.error) msg = S.error.code === "permission-denied" ? "The database refused to load. Check that the security rules from firestore.rules are published." : "The connection to the board dropped. Reload the page to reconnect.";
+  else if (S.stalled && S.gotPlayers) msg = "Showing the last saved copy. It may be out of date until the connection comes back.";
+  else if (!S.configMissing && S.myId && !canEdit() && S.gotPlayers) { msg = "View only. Enter the team passcode to add players and move champions."; action = h("button", { class: "btn primary small", type: "button", text: "Unlock editing", onclick: () => openUnlockDialog("editor") }); }
+  n.hidden = !msg; if (msg) n.append(h("span", { text: msg }), action);
+}
+function renderRoster() {
+  const r = $("roster"); r.replaceChildren();
+  if (!S.order.length) { if (canEdit()) r.append(h("button", { class: "tab add", type: "button", onclick: () => openPlayerDialog(null), text: "+ Add player" })); return; }
+  r.append(h("button", { class: "tab", role: "tab", type: "button", "aria-selected": S.view === "team" ? "true" : "false", onclick: () => go("team") }, "Team view"));
+  for (const id of S.order) {
+    const p = S.players.get(id);
+    r.append(h("button", { class: "tab", role: "tab", type: "button", "aria-selected": S.view === id ? "true" : "false", onclick: () => go(id) },
+      h("span", { class: "role", text: ROLE_ABBR[p.role] || p.role || "" }), h("span", { text: p.name || "Unnamed" }), h("span", { class: "count", text: String(champCount(p)) })));
+  }
+  if (canEdit()) r.append(h("button", { class: "tab add", type: "button", onclick: () => openPlayerDialog(null), text: "+ Add player" }));
+}
+function go(view) { S.view = view; S.sel = null; store("cb-view", view); render(); }
+
+function renderMain() {
+  const m = $("main");
+  if (S.configMissing) {
+    if (built !== "setup") { built = "setup"; m.className = "main";
+      m.replaceChildren(h("section", { class: "panel empty-state" }, h("h2", { text: "Connect Firebase" }),
+        h("p", {}, "This page doesn't have a Firebase project yet. Open ", h("code", { text: "index.html" }), ", paste your web app config into ", h("code", { text: "FIREBASE_CONFIG" }), " near the top of the script, and reload."))); }
+    return;
+  }
+  if (!S.gotPlayers) { built = "loading"; m.className = "main"; m.replaceChildren(h("div", { class: "panel loading", text: S.stalled ? "Can't reach the saved board yet. It will load as soon as the connection answers." : "Loading the board…" })); return; }
+  if (S.view === "settings" && S.owner) { renderSettings(m); return; }
+  if (!S.order.length) {
+    const key = "empty-" + (canEdit() ? "e" : "v");
+    if (built !== key) { built = key; m.className = "main";
+      const panel = h("section", { class: "panel empty-state" }, h("h2", { text: "No players yet" }),
+        h("p", { text: canEdit() ? "Add each teammate, then drop the champions they play into tiers. Every move between tiers is logged with who made it." : "Nobody has added a player yet. Unlock editing with the team passcode to add the first one." }),
+        h("div", { class: "legend" }, TIERS.map(({ k }) => h("div", { style: tierVar(k) }, h("b", { text: lab(k) }), h("span", { text: capOf(k) })))));
+      if (canEdit()) panel.append(playerForm(null, () => {}));
+      m.replaceChildren(panel); }
+    return;
+  }
+  if (S.view === "settings" && !S.owner) S.view = "team";
+  if (S.view === "settings") { renderSettings(m); return; }
+  if (!S.view || (S.view !== "team" && !S.players.has(S.view))) S.view = "team";
+  if (S.view === "team") renderTeam(m); else renderPlayer(m, S.view);
+}
+
+function renderTeam(m) {
+  if (built !== "team") { built = "team"; m.className = "main split"; m.replaceChildren(h("section", { id: "teamGrid", class: "team-grid" }), historyPanel(true)); }
+  const g = $("teamGrid"); g.replaceChildren();
+  for (const id of S.order) {
+    const p = S.players.get(id); const t = tiersOf(p);
+    g.append(h("div", { class: "panel card", role: "button", tabindex: "0", "aria-label": `Open ${p.name}'s tiers`, onclick: () => go(id),
+      onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(id); } } },
+      h("div", { class: "card-head" }, h("h3", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" })),
+      h("div", { class: "card-rows" }, TIERS.map(({ k }) => h("div", { class: "crow", style: tierVar(k) }, h("b", { text: lab(k) }),
+        t[k].length ? h("span", { text: t[k].join(", ") }) : h("span", { class: "none", text: "—" }))))));
+  }
+  renderHistory();
+}
+
+function renderPlayer(m, pid) {
+  const key = pid + (canEdit() ? ":e" : ":v");
+  if (built !== key) {
+    built = key; m.className = "main split";
+    m.replaceChildren(h("section", { class: "panel" }, h("div", { id: "boardHead", class: "board-head" }), canEdit() ? addChampForm(pid) : null, h("div", { id: "tiers" })), historyPanel(false));
+  }
+  const p = S.players.get(pid); const t = tiersOf(p); const total = champCount(p);
+  $("boardHead").replaceChildren(
+    h("div", { class: "who" }, h("h2", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" }),
+      h("span", { class: "meta", text: `${total} champion${total === 1 ? "" : "s"} · ${t.S.length} in ${lab("S")}` })),
+    canEdit() ? h("button", { class: "btn ghost", type: "button", onclick: () => openPlayerDialog(pid), text: "Edit player" }) : null);
+  const trend = trendMap(pid); const wrap = $("tiers"); wrap.replaceChildren();
+  for (const { k } of TIERS) {
+    const cap = capOf(k);
+    const zone = h("div", { class: "zone" + (S.sel && S.sel.pid === pid && findTier(p, S.sel.champ) !== k ? " target" : ""), "aria-label": `${lab(k)} tier${cap ? ", " + cap : ""}` });
+    if (t[k].length) t[k].forEach(c => zone.append(chip(pid, c, k, trend[c])));
+    else zone.append(h("span", { class: "empty", text: canEdit() ? "Drop champions here" : "Empty" }));
+    wireZone(zone, pid, k);
+    wrap.append(h("div", { class: "tier", style: tierVar(k) }, h("div", { class: "tier-label" }, labEl(k), cap ? h("small", { text: cap }) : null), zone));
+  }
+  if (canEdit()) refreshDatalist(pid);
+  renderHistory();
+}
+
+function chip(pid, champ, tier, mv) {
+  const sel = S.sel && S.sel.pid === pid && S.sel.champ === champ; const editable = canEdit();
+  let tr = null;
+  if (mv) {
+    if (mv.from && mv.to) { const up = RANK[mv.to] < RANK[mv.from]; tr = h("span", { class: "trend " + (up ? "up" : "down"), title: `${up ? "Up" : "Down"} from ${lab(mv.from)}, ${rel(mv.at)}`, text: up ? "▲" : "▼" }); }
+    else if (mv.to) tr = h("span", { class: "trend new", title: `Added ${rel(mv.at)}` });
+  }
+  const b = h("button", { class: "chip" + (sel ? " is-sel" : ""), type: "button", draggable: editable ? "true" : null, "aria-pressed": editable ? (sel ? "true" : "false") : null,
+    dataset: { champ, tier }, title: editable ? "Select to move, or drag to another tier" : champ },
+    h("span", { class: "mono", style: `--h:${hue(champ)}`, "aria-hidden": "true", text: initials(champ) }), h("span", { class: "cname", text: champ }), tr);
+  if (editable) {
+    b.addEventListener("click", (e) => { e.stopPropagation(); S.sel = sel ? null : { pid, champ }; render(); });
+    b.addEventListener("dragstart", (e) => { S.drag = { pid, champ }; try { e.dataTransfer.setData("text/plain", champ); e.dataTransfer.effectAllowed = "move"; } catch (x) {} b.classList.add("dragging"); });
+    b.addEventListener("dragend", () => { S.drag = null; b.classList.remove("dragging"); document.querySelectorAll(".zone.over").forEach(z => z.classList.remove("over")); });
+  }
+  return b;
+}
+function wireZone(zone, pid, k) {
+  if (!canEdit()) return;
+  zone.addEventListener("dragover", (e) => { if (!S.drag) return; e.preventDefault(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove("over"); });
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault(); zone.classList.remove("over");
+    const d = S.drag; S.drag = null; if (!d || d.pid !== pid) return;
+    const target = e.target.closest && e.target.closest(".chip"); const before = target ? target.dataset.champ : null;
+    if (before === d.champ) return; moveChamp(pid, d.champ, k, before);
+  });
+  zone.addEventListener("click", (e) => {
+    if (!S.sel || S.sel.pid !== pid || e.target.closest(".chip")) return;
+    const champ = S.sel.champ; S.sel = null; moveChamp(pid, champ, k); render();
+  });
+}
+function trendMap(pid) {
+  const out = {}; const cutoff = Date.now() - 14 * 864e5;
+  for (const mv of S.moves) { if (mv.at < cutoff) break; if (mv.player !== pid || out[mv.champ]) continue; out[mv.champ] = mv; }
+  return out;
+}
+
+function addChampForm(pid) {
+  const input = h("input", { id: "ac-name", type: "text", list: "ac-list", placeholder: "Add a champion…", autocomplete: "off", "aria-label": "Champion name", maxlength: "24" });
+  const seg = h("div", { class: "seg", role: "radiogroup", "aria-label": "Tier" });
+  for (const { k } of TIERS) seg.append(
+    h("input", { type: "radio", name: "ac-tier", id: "ac-tier-" + k, value: k, checked: S.addTier === k ? true : null, onchange: () => { S.addTier = k; } }),
+    h("label", { for: "ac-tier-" + k, style: tierVar(k), text: lab(k) }));
+  const f = h("form", { class: "addchamp" }, input, h("datalist", { id: "ac-list" }), seg, h("button", { class: "btn primary", type: "submit", text: "Add" }));
+  f.addEventListener("submit", (e) => {
+    e.preventDefault(); const raw = input.value.trim(); if (!raw) { input.focus(); return; }
+    const name = canonical(raw); const cur = findTier(S.players.get(pid), name); const to = S.addTier;
+    if (cur === to) toast(`${name} is already in ${lab(to)}.`);
+    else { moveChamp(pid, name, to); if (cur) toast(`${name} moved from ${lab(cur)} to ${lab(to)}.`); }
+    input.value = ""; input.focus();
+  });
+  return f;
+}
+function refreshDatalist(pid) {
+  const dl = $("ac-list"); if (!dl) return;
+  const have = new Set(Object.values(tiersOf(S.players.get(pid))).flat());
+  dl.replaceChildren(...CHAMPS.filter(c => !have.has(c)).map(c => h("option", { value: c })));
+}
+
+function historyPanel(teamOnly) {
+  const seg = teamOnly ? null : h("div", { class: "mini-seg", role: "group", "aria-label": "History scope" },
+    h("button", { type: "button", id: "hs-player", onclick: () => { S.histScope = "player"; renderHistory(); } }, "This player"),
+    h("button", { type: "button", id: "hs-team", onclick: () => { S.histScope = "team"; renderHistory(); } }, "Whole team"));
+  return h("aside", { class: "panel", "aria-label": "Movement history" }, h("div", { class: "hist-head" }, h("h3", { text: "Movement" }), seg), h("ol", { id: "histList", class: "hist-list" }));
+}
+function renderHistory() {
+  const list = $("histList"); if (!list) return;
+  const teamScope = S.view === "team" || S.histScope === "team";
+  const hp = $("hs-player"), ht = $("hs-team");
+  if (hp) { hp.setAttribute("aria-pressed", teamScope ? "false" : "true"); ht.setAttribute("aria-pressed", teamScope ? "true" : "false"); }
+  const rows = S.moves.filter(mv => S.players.has(mv.player) && (teamScope || mv.player === S.view)).slice(0, 80);
+  list.replaceChildren();
+  if (!rows.length) { list.append(h("li", { class: "hist-empty" }, "No moves yet. Adding, moving and removing champions shows up here with who did it.")); return; }
+  for (const mv of rows) {
+    const c = h("b", { text: mv.champ }); let kind, line;
+    if (!mv.from) { kind = ["add", "+"]; line = [c, " added at ", tp(mv.to)]; }
+    else if (!mv.to) { kind = ["rm", "−"]; line = [c, " removed from ", tp(mv.from)]; }
+    else { const up = RANK[mv.to] < RANK[mv.from]; kind = up ? ["up", "▲"] : ["down", "▼"]; line = [c, " ", tp(mv.from), " → ", tp(mv.to)]; }
+    const who = mv.by && mv.by === S.myId ? "you" : (mv.byName || "a teammate");
+    const line2 = [];
+    if (teamScope) line2.push(S.players.get(mv.player).name || "Unnamed", " · ");
+    line2.push("by ", who, " · ", h("time", { datetime: new Date(mv.at).toISOString(), title: new Date(mv.at).toLocaleString(), text: rel(mv.at) }));
+    list.append(h("li", {}, h("span", { class: "badge " + kind[0], "aria-hidden": "true", text: kind[1] }),
+      h("div", { class: "hl" }, h("div", { class: "line1" }, line), h("div", { class: "line2" }, line2))));
+  }
+}
+function tp(k) { return h("span", { class: "tp", style: tierVar(k), text: lab(k) }); }
+
+function renderActionBar() {
+  const bar = $("actionbar"); const sel = S.sel; const p = sel && S.players.get(sel.pid); const cur = p && findTier(p, sel.champ);
+  if (!sel || !p || !cur || S.view !== sel.pid || !canEdit()) { if (sel && (!p || !cur || !canEdit())) S.sel = null; bar.hidden = true; document.body.classList.remove("has-bar"); return; }
+  document.body.classList.add("has-bar"); bar.hidden = false;
+  bar.replaceChildren(h("div", { class: "ab-inner" },
+    h("div", { class: "ab-name" }, h("span", { class: "mono", style: `--h:${hue(sel.champ)}`, text: initials(sel.champ) }), h("span", { text: sel.champ }), h("span", { class: "ab-hint", text: `in ${lab(cur)} · pick a tier or tap a row` })),
+    h("div", { class: "ab-tiers" }, TIERS.map(({ k }) => h("button", { type: "button", style: tierVar(k), disabled: k === cur ? true : null, "aria-label": `Move to ${lab(k)}`, text: lab(k),
+      onclick: () => { S.sel = null; moveChamp(sel.pid, sel.champ, k); render(); } }))),
+    h("button", { class: "btn danger", type: "button", text: "Remove", onclick: () => { S.sel = null; removeChamp(sel.pid, sel.champ); render(); } }),
+    h("button", { class: "btn ghost", type: "button", text: "Done", onclick: () => { S.sel = null; render(); } })));
+}
+
+/* ---------- dialogs ---------- */
+function closeOverlay() { const ov = $("overlay"); ov.hidden = true; ov.replaceChildren(); }
+function showOverlay(dlg) {
+  const ov = $("overlay"); ov.replaceChildren(dlg); ov.hidden = false;
+  ov.onclick = (e) => { if (e.target === ov) closeOverlay(); };
+  setTimeout(() => { const i = dlg.querySelector("input"); if (i) i.focus(); }, 0);
+}
+function playerForm(pid, onDone) {
+  const p = pid ? S.players.get(pid) : null;
+  const nm = h("input", { id: pid ? "pp-name" : "np-name", type: "text", maxlength: "24", required: true, value: p ? p.name : null, placeholder: "Summoner or first name", autocomplete: "off" });
+  const role = h("select", { id: pid ? "pp-role" : "np-role" }, ROLES.map(r => h("option", { value: r, selected: p && p.role === r ? true : null, text: r })));
+  const f = h("form", { class: "form-row" },
+    h("div", { class: "field" }, h("label", { for: nm.id, text: "Player" }), nm),
+    h("div", { class: "field", style: "flex:0 1 150px" }, h("label", { for: role.id, text: "Role" }), role),
+    pid ? null : h("button", { class: "btn primary", type: "submit", text: "Add player" }));
+  f.addEventListener("submit", (e) => {
+    e.preventDefault(); const name = nm.value.trim().slice(0, 24); if (!name) { nm.focus(); return; }
+    if (pid) editPlayer(pid, name, role.value); else addPlayer(name, role.value);
+    nm.value = ""; onDone();
+  });
+  return f;
+}
+function openPlayerDialog(pid) {
+  if (!canEdit()) return;
+  const form = playerForm(pid, closeOverlay); const p = pid ? S.players.get(pid) : null;
+  const dlg = h("div", { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": pid ? "Edit player" : "Add player" }, h("h2", { text: pid ? "Edit player" : "Add player" }), form);
+  if (pid) {
+    const foot = h("div", { class: "row-split" });
+    const showMain = () => foot.replaceChildren(
+      h("button", { class: "btn danger", type: "button", text: "Remove player", onclick: showConfirm }),
+      h("div", { style: "display:flex;gap:8px" }, h("button", { class: "btn", type: "button", text: "Cancel", onclick: closeOverlay }), h("button", { class: "btn primary", type: "button", text: "Save", onclick: () => form.requestSubmit() })));
+    const showConfirm = () => { const n = champCount(p);
+      foot.replaceChildren(h("p", { style: "width:100%", text: `Remove ${p.name} along with ${n} champion${n === 1 ? "" : "s"} and their movement history? This can't be undone.` }),
+        h("button", { class: "btn", type: "button", text: "Keep player", onclick: showMain }),
+        h("button", { class: "btn danger solid", type: "button", text: "Remove for everyone", onclick: () => { closeOverlay(); deletePlayer(pid); toast(`${p.name} removed.`); } })); };
+    showMain(); dlg.append(foot);
+  } else dlg.append(h("div", { class: "row-end" }, h("button", { class: "btn ghost", type: "button", text: "Cancel", onclick: closeOverlay })));
+  showOverlay(dlg);
+}
+function openUnlockDialog(mode) {
+  if (!S.db || !S.myId) return;
+  const owner = mode === "owner";
+  const nm = h("input", { id: "ul-name", type: "text", maxlength: "24", required: true, value: S.myName || load("cb-name") || null, placeholder: "Shown in the movement log", autocomplete: "nickname" });
+  const pc = h("input", { id: "ul-code", type: "password", required: true, maxlength: "64", autocomplete: "current-password", placeholder: owner ? "Owner passcode" : "Team passcode" });
+  const err = h("p", { class: "form-err", hidden: true });
+  const submit = h("button", { class: "btn primary", type: "submit", text: owner ? "Unlock owner settings" : "Unlock" });
+  const f = h("form", { style: "display:grid;gap:12px" },
+    h("div", { class: "field" }, h("label", { for: "ul-name", text: "Your name" }), nm),
+    h("div", { class: "field" }, h("label", { for: "ul-code", text: owner ? "Owner passcode" : "Passcode" }), pc), err,
+    h("div", { class: "row-end" }, h("button", { class: "btn ghost", type: "button", text: "Cancel", onclick: closeOverlay }), submit));
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault(); const name = nm.value.trim().slice(0, 24); const code = pc.value;
+    if (!name || !code) return;
+    submit.disabled = true; err.hidden = true;
+    try {
+      const body = owner ? { ownerCode: code, name, joinedAt: Date.now() } : { code, name, joinedAt: Date.now() };
+      await setDoc(doc(S.db, "members", S.myId), body);
+      if (owner) { S.owner = true; S.editor = true; S.view = "settings"; } else { S.editor = true; S.owner = false; }
+      S.myName = name; store("cb-name", name); built = null; closeOverlay(); render();
+      toast(owner ? "Owner settings unlocked on this device." : "Editing unlocked on this device.");
+    } catch (x) {
+      err.textContent = x && x.code === "permission-denied" ? `That ${owner ? "owner " : ""}passcode didn't work.` : "Couldn't reach the board to check the passcode. Try again.";
+      err.hidden = false; submit.disabled = false; pc.select();
+    }
+  });
+  showOverlay(h("div", { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": owner ? "Owner access" : "Unlock editing" },
+    h("h2", { text: owner ? "Owner access" : "Unlock editing" }),
+    h("p", { text: owner
+      ? "The owner passcode unlocks editing plus tier labels, clearing history and resetting boards on this device."
+      : "Anyone with the link can view the board. Enter the team passcode to add players and move champions from this device." }), f));
+}
+
+/* ---------- owner settings ---------- */
+async function deleteRefs(refs, onProgress) {
+  // Single deletes in small parallel groups, so each request stays inside the rules' per-request lookup limit.
+  let done = 0;
+  for (let i = 0; i < refs.length; i += 20) {
+    await Promise.all(refs.slice(i, i + 20).map(r => deleteDoc(r)));
+    done = Math.min(refs.length, i + 20); if (onProgress) onProgress(done, refs.length);
+  }
+  return refs.length;
+}
+async function runOwnerOp(label, fn) {
+  if (S.busy) return;
+  S.busy = label + "…"; renderSettings($("main"));
+  try {
+    const msg = await fn((d, n) => { S.busy = `${label}… ${d} of ${n}`; const el = $("busyText"); if (el) el.textContent = S.busy; });
+    toast(msg);
+  } catch (e) { onWriteError(e); }
+  S.busy = null; if (S.view === "settings") renderSettings($("main"));
+}
+async function clearHistory(pid) {
+  const q = pid ? query(collection(S.db, "moves"), where("player", "==", pid)) : collection(S.db, "moves");
+  return runOwnerOp(pid ? "Clearing history" : "Clearing all history", async (prog) => {
+    const snap = await getDocs(q); const n = await deleteRefs(snap.docs.map(d => d.ref), prog);
+    return n ? `Deleted ${n} history entr${n === 1 ? "y" : "ies"}.` : "There was no history to clear.";
+  });
+}
+async function resetBoards(pids, alsoHistory) {
+  return runOwnerOp(pids.length > 1 ? "Resetting all boards" : "Resetting board", async (prog) => {
+    for (const pid of pids) await updateDoc(doc(S.db, "players", pid), { tiers: { S: [], A: [], B: [], C: [], D: [] }, updatedAt: Date.now(), updatedBy: S.myId });
+    let n = 0;
+    if (alsoHistory) {
+      const all = pids.length === S.order.length;
+      const snap = await getDocs(all ? collection(S.db, "moves") : query(collection(S.db, "moves"), where("player", "in", pids.slice(0, 30))));
+      n = await deleteRefs(snap.docs.map(d => d.ref), prog);
+    }
+    const what = pids.length > 1 ? `${pids.length} boards reset` : `${S.players.get(pids[0])?.name || "Board"} reset`;
+    return alsoHistory ? `${what}, ${n} history entr${n === 1 ? "y" : "ies"} deleted.` : `${what}.`;
+  });
+}
+function confirmDialog(title, text, actionLabel, fn) {
+  showOverlay(h("div", { class: "panel dialog", role: "dialog", "aria-modal": "true", "aria-label": title },
+    h("h2", { text: title }), h("p", { text: text }),
+    h("div", { class: "row-end" }, h("button", { class: "btn", type: "button", text: "Cancel", onclick: closeOverlay }),
+      h("button", { class: "btn danger solid", type: "button", text: actionLabel, onclick: () => { closeOverlay(); fn(); } }))));
+}
+async function saveTierLabels(form) {
+  const tiers = {};
+  for (const { k } of TIERS) {
+    const label = form.querySelector("#tl-" + k).value.trim().slice(0, 4);
+    const cap = form.querySelector("#tc-" + k).value.trim().slice(0, 24);
+    tiers[k] = { label: label || k, cap };
+  }
+  const labels = TIERS.map(({ k }) => tiers[k].label.toLowerCase());
+  if (new Set(labels).size !== labels.length) { toast("Each tier needs a different letter."); return; }
+  try { await setDoc(doc(S.db, "settings", "board"), { tiers, updatedAt: Date.now(), updatedBy: S.myId }); toast("Tier labels saved for everyone."); }
+  catch (e) { onWriteError(e); }
+}
+
+function renderSettings(m) {
+  if (built !== "settings") {
+    built = "settings"; m.className = "main";
+    m.replaceChildren(h("div", { id: "settingsWrap", class: "settings" }));
+  }
+  const wrap = $("settingsWrap"); if (!wrap) return;
+  const keepFocus = document.activeElement && wrap.contains(document.activeElement) && document.activeElement.id;
+  const prevTierForm = $("tierForm");
+  const disabled = S.busy ? true : null;
+
+  // 1. Tier labels (kept as-is while the owner is typing so edits aren't overwritten by live updates)
+  let tierSec = $("tierSec");
+  if (!tierSec || !prevTierForm || !prevTierForm.dataset.dirty) {
+    const form = h("form", { id: "tierForm", class: "tier-edit" },
+      h("div", { class: "te-head" }, h("span", {}), h("span", { text: "Letter" }), h("span", { text: "Subtitle" })),
+      TIERS.map(({ k }) => {
+        const sw = h("span", { class: "sw", style: tierVar(k), text: lab(k) });
+        const li = h("input", { id: "tl-" + k, class: "lbl", type: "text", maxlength: "4", value: lab(k), "aria-label": `Letter for tier ${TIERS.findIndex(t => t.k === k) + 1}`,
+          oninput: (e) => { sw.textContent = e.target.value.trim() || k; } });
+        const ci = h("input", { id: "tc-" + k, type: "text", maxlength: "24", value: capOf(k), placeholder: "No subtitle", "aria-label": `Subtitle for tier ${TIERS.findIndex(t => t.k === k) + 1}` });
+        return h("div", { class: "te-row" }, sw, li, ci);
+      }),
+      h("div", { class: "row-split" },
+        h("button", { class: "btn ghost", type: "button", text: "Restore defaults", onclick: () => {
+          for (const { k, cap } of TIERS) { $("tl-" + k).value = k; $("tc-" + k).value = cap; $("tl-" + k).dispatchEvent(new Event("input")); }
+          $("tierForm").dataset.dirty = "1"; } }),
+        h("button", { class: "btn primary", type: "submit", text: "Save tier labels" })));
+    form.addEventListener("input", () => { form.dataset.dirty = "1"; });
+    form.addEventListener("submit", async (e) => { e.preventDefault(); delete form.dataset.dirty; await saveTierLabels(form); });
+    const sec = h("section", { id: "tierSec", class: "panel set-sec" }, h("h2", { text: "Tier labels" }),
+      h("p", { text: "Rename the five tiers and their subtitles. Changes show up for everyone right away, and champions stay in the same rows." }), form);
+    if (tierSec) tierSec.replaceWith(sec); else wrap.append(sec);
+    tierSec = sec;
+  }
+
+  // 2. Reset boards
+  const alsoHist = $("rb-hist") ? $("rb-hist").checked : true;
+  const resetList = h("div", { class: "reset-list" });
+  for (const id of S.order) {
+    const p = S.players.get(id); const n = champCount(p); const hn = S.moves.filter(mv => mv.player === id).length;
+    resetList.append(h("div", { class: "rl-row" },
+      h("div", { class: "rl-name" }, h("b", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" }),
+        h("span", { class: "rl-meta", text: `${n} champion${n === 1 ? "" : "s"}` })),
+      h("button", { class: "btn small", type: "button", disabled: disabled || (!n && !hn) ? true : null, text: "Clear history", title: "Delete this player's movement log, keep their tiers",
+        onclick: () => confirmDialog(`Clear ${p.name}'s history?`, `Every logged move for ${p.name} is deleted for everyone. Their tiers stay as they are. This can't be undone.`, "Clear history", () => clearHistory(id)) }),
+      h("button", { class: "btn small danger", type: "button", disabled: disabled || !n ? true : null, text: "Reset board",
+        onclick: () => { const hist = $("rb-hist").checked; confirmDialog(`Reset ${p.name}'s board?`, `All ${n} champion${n === 1 ? "" : "s"} are removed from ${p.name}'s tiers${hist ? " and their history is deleted" : ""}. The player stays on the roster. This can't be undone.`, "Reset board", () => resetBoards([id], hist)); } })));
+  }
+  const totalChamps = S.order.reduce((a, id) => a + champCount(S.players.get(id)), 0);
+  resetList.append(h("div", { class: "rl-row rl-all" },
+    h("div", { class: "rl-name" }, h("b", { text: "Every player" }), h("span", { class: "rl-meta", text: `${S.order.length} board${S.order.length === 1 ? "" : "s"} · ${totalChamps} champions` })),
+    h("button", { class: "btn small danger", type: "button", disabled: disabled || !totalChamps ? true : null, text: "Reset all boards",
+      onclick: () => { const hist = $("rb-hist").checked; confirmDialog("Reset every board?", `All ${totalChamps} champions are removed from all ${S.order.length} players' tiers${hist ? ", and all history is deleted" : ""}. Players stay on the roster. This can't be undone.`, "Reset all boards", () => resetBoards(S.order.slice(), hist)); } })));
+  const resetSec = h("section", { id: "resetSec", class: "panel set-sec" }, h("h2", { text: "Reset boards" }),
+    h("p", { text: "Resetting empties a player's tiers but keeps them on the roster. Download a backup from the header first if you might want the old tiers back." }),
+    h("label", { class: "check" }, h("input", { id: "rb-hist", type: "checkbox", checked: alsoHist ? true : null }), "Also delete the history of boards I reset"),
+    S.order.length ? resetList : h("p", { class: "meta", text: "No players yet." }));
+
+  // 3. History
+  const histSec = h("section", { id: "histSec", class: "panel set-sec" }, h("h2", { text: "History" }),
+    h("p", { text: "Clearing history deletes the movement log for everyone. Tiers aren't changed. Trend arrows on champions disappear along with it." }),
+    h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" },
+      h("button", { class: "btn danger", type: "button", disabled: disabled || !S.moves.length ? true : null, text: "Clear all history",
+        onclick: () => confirmDialog("Clear all history?", "Every logged move for every player is deleted for everyone. Tiers stay as they are. This can't be undone.", "Clear all history", () => clearHistory(null)) }),
+      S.busy ? h("span", { id: "busyText", class: "progress", text: S.busy }) : null));
+
+  // 4. This device
+  const devSec = h("section", { id: "devSec", class: "panel set-sec" }, h("h2", { text: "This device" }),
+    h("p", { text: "To change either passcode, edit config/team in the Firebase console. Every device using the old passcode is locked out until it enters the new one." }),
+    h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" },
+      h("button", { class: "btn", type: "button", text: "Back to the board", onclick: () => go("team") }),
+      h("button", { class: "btn ghost", type: "button", text: "Lock this device", onclick: lockDevice })));
+
+  for (const [id, el] of [["resetSec", resetSec], ["histSec", histSec], ["devSec", devSec]]) { const old = $(id); if (old) old.replaceWith(el); else wrap.append(el); }
+  if (keepFocus && $(keepFocus) && document.activeElement !== $(keepFocus)) $(keepFocus).focus();
+}
+
+async function lockDevice() {
+  S.editor = false; S.owner = false; S.sel = null; built = null; if (S.view === "settings") S.view = "team"; render();
+  stopListeners();
+  try { await signOut(S.auth); } catch (e) {}
+  toast("Editing locked on this device.");
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!$("overlay").hidden) { closeOverlay(); return; }
+  if (S.sel) { S.sel = null; render(); }
+});
+document.addEventListener("click", (e) => { if (S.sel && !e.target.closest(".zone, .chip, .actionbar, .overlay, .toast")) { S.sel = null; render(); } });
+setInterval(() => { document.querySelectorAll(".hist-list time").forEach(t => { t.textContent = rel(Date.parse(t.getAttribute("datetime"))); }); }, 60000);
+
+/* ---------- boot ---------- */
+function stopListeners() { unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = []; }
+function startListeners() {
+  stopListeners();
+  const timer = setTimeout(() => { if (!S.loaded) { S.stalled = true; render(); } }, 10000);
+  unsubs.push(onSnapshot(query(collection(S.db, "players"), orderBy("createdAt")), { includeMetadataChanges: true }, (snap) => {
+    S.players = new Map(snap.docs.map(d => [d.id, d.data()])); S.order = snap.docs.map(d => d.id); S.gotPlayers = true;
+    if (!snap.metadata.fromCache) { clearTimeout(timer); S.loaded = true; S.stalled = false; }
+    render();
+  }, (err) => { clearTimeout(timer); S.error = err; S.gotPlayers = true; render(); }));
+  unsubs.push(onSnapshot(doc(S.db, "settings", "board"), (snap) => {
+    S.tierCfg = (snap.exists() && snap.data().tiers) || {}; render();
+  }, (err) => console.error(err)));
+  unsubs.push(onSnapshot(query(collection(S.db, "moves"), orderBy("at", "desc"), limit(400)), (snap) => {
+    S.moves = snap.docs.map(d => d.data()); render();
+  }, (err) => console.error(err)));
+}
+
+function boot() {
+  const saved = load("cb-view"); if (saved) S.view = saved;
+  if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.startsWith("PASTE")) { S.configMissing = true; render(); return; }
+  const app = initializeApp(FIREBASE_CONFIG);
+  S.auth = getAuth(app); S.db = getFirestore(app);
+  render();
+  onAuthStateChanged(S.auth, async (u) => {
+    if (!u) { S.myId = null; S.editor = false; S.owner = false; try { await signInAnonymously(S.auth); } catch (e) { S.error = e; render(); } return; }
+    S.myId = u.uid;
+    try {
+      const m = await getDoc(doc(S.db, "members", u.uid));
+      if (m.exists()) { const md = m.data(); S.editor = "code" in md; S.owner = "ownerCode" in md; S.myName = md.name || ""; }
+    } catch (e) {}
+    built = null; startListeners(); render();
+  });
+}
+boot();
+</script>
+</body>
+</html>
