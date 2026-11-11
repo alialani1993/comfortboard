@@ -151,8 +151,22 @@ img.mono { object-fit: cover; background: var(--surface-2); display: block; }
 .crow { display: grid; grid-template-columns: minmax(26px, max-content) minmax(0, 1fr); border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
 .crow:last-child { border-bottom: 0; }
 .crow b { background: var(--tc); color: var(--tier-ink); font-family: var(--f-display); font-size: 15px; display: grid; place-items: center; padding: 0 5px; }
-.crow span { padding: 5px 8px; font-size: 12.5px; overflow-wrap: anywhere; }
-.crow span.none { color: var(--muted); opacity: .6; }
+.crow > span { padding: 5px 8px; font-size: 12.5px; overflow-wrap: anywhere; min-width: 0; }
+.crow > span.none { color: var(--muted); opacity: .6; }
+.crow > .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 5px 6px; min-width: 0; }
+.mini { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 2px 7px 2px 2px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); max-width: 100%; }
+.mini > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mono.sm { width: 20px; height: 20px; font-size: 10px; border-radius: 4px; }
+.mono.md { width: 30px; height: 30px; font-size: 13px; }
+.mono.lg { width: 38px; height: 38px; font-size: 15px; border-radius: 6px; }
+.chip.icon-only { padding: 3px; position: relative; }
+.chip.icon-only .trend { position: absolute; top: -4px; right: -4px; background: var(--surface); border-radius: 50%; padding: 1px 2px; }
+.chip.icon-only .trend.new { padding: 0; border: 2px solid var(--surface); width: 10px; height: 10px; }
+.chip.name-only { padding: 5px 10px; }
+.view-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.view-bar .lbl { font-size: 12px; color: var(--muted); }
+.disp { display: inline-flex; align-items: center; gap: 8px; }
+.team-col { display: grid; gap: 12px; min-width: 0; }
 
 .empty-state { padding: 32px 24px; display: grid; gap: 16px; justify-items: start; }
 .empty-state h2 { font-family: var(--f-display); font-weight: 700; font-size: 30px; margin: 0; text-transform: uppercase; }
@@ -279,7 +293,7 @@ const ROLE_ABBR = { Top: "Top", Jungle: "Jg", Mid: "Mid", Bot: "Bot", Support: "
 const CHAMPS = ["Aatrox","Ahri","Akali","Akshan","Alistar","Ambessa","Amumu","Anivia","Annie","Aphelios","Ashe","Aurelion Sol","Aurora","Azir","Bard","Bel'Veth","Blitzcrank","Brand","Braum","Briar","Caitlyn","Camille","Cassiopeia","Cho'Gath","Corki","Darius","Diana","Dr. Mundo","Draven","Ekko","Elise","Evelynn","Ezreal","Fiddlesticks","Fiora","Fizz","Galio","Gangplank","Garen","Gnar","Gragas","Graves","Gwen","Hecarim","Heimerdinger","Hwei","Illaoi","Irelia","Ivern","Janna","Jarvan IV","Jax","Jayce","Jhin","Jinx","K'Sante","Kai'Sa","Kalista","Karma","Karthus","Kassadin","Katarina","Kayle","Kayn","Kennen","Kha'Zix","Kindred","Kled","Kog'Maw","LeBlanc","Lee Sin","Leona","Lillia","Lissandra","Lucian","Lulu","Lux","Malphite","Malzahar","Maokai","Master Yi","Mel","Milio","Miss Fortune","Mordekaiser","Morgana","Naafiri","Nami","Nasus","Nautilus","Neeko","Nidalee","Nilah","Nocturne","Nunu & Willump","Olaf","Orianna","Ornn","Pantheon","Poppy","Pyke","Qiyana","Quinn","Rakan","Rammus","Rek'Sai","Rell","Renata Glasc","Renekton","Rengar","Riven","Rumble","Ryze","Samira","Sejuani","Senna","Seraphine","Sett","Shaco","Shen","Shyvana","Singed","Sion","Sivir","Skarner","Smolder","Sona","Soraka","Swain","Sylas","Syndra","Tahm Kench","Taliyah","Talon","Taric","Teemo","Thresh","Tristana","Trundle","Tryndamere","Twisted Fate","Twitch","Udyr","Urgot","Varus","Vayne","Veigar","Vel'Koz","Vex","Vi","Viego","Viktor","Vladimir","Volibear","Warwick","Wukong","Xayah","Xerath","Xin Zhao","Yasuo","Yone","Yorick","Yunara","Yuumi","Zac","Zed","Zeri","Ziggs","Zilean","Zoe","Zyra"];
 
 const S = {
-  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null,
+  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null, display: { team: "both", player: "both" },
   configMissing: false, error: null, loaded: false, stalled: false, gotPlayers: false,
   players: new Map(), order: [], moves: [],
   view: null, sel: null, drag: null, histScope: "player", addTier: "B",
@@ -437,6 +451,13 @@ function renderRoster() {
   }
   if (canEdit()) r.append(h("button", { class: "tab add", type: "button", onclick: () => openPlayerDialog(null), text: "+ Add player" }));
 }
+const DISP = [["both", "Both"], ["icons", "Icons"], ["names", "Names"]];
+function dispToggle(scope) {
+  return h("div", { class: "disp" }, h("span", { class: "lbl", text: "Show", style: "font-size:12px;color:var(--muted)" }),
+    h("div", { class: "mini-seg", role: "group", "aria-label": scope === "team" ? "Team view display" : "Board display" },
+      DISP.map(([v, label]) => h("button", { type: "button", "aria-pressed": S.display[scope] === v ? "true" : "false", text: label,
+        onclick: (e) => { e.stopPropagation(); S.display[scope] = v; store("cb-disp-" + scope, v); render(); } }))));
+}
 function go(view) { S.view = view; S.sel = null; store("cb-view", view); render(); }
 
 function renderMain() {
@@ -466,7 +487,10 @@ function renderMain() {
 }
 
 function renderTeam(m) {
-  if (built !== "team") { built = "team"; m.className = "main split"; m.replaceChildren(h("section", { id: "teamGrid", class: "team-grid" }), historyPanel(true)); }
+  if (built !== "team") { built = "team"; m.className = "main split";
+    m.replaceChildren(h("div", { class: "team-col" }, h("div", { id: "teamBar", class: "view-bar" }), h("section", { id: "teamGrid", class: "team-grid" })), historyPanel(true)); }
+  const mode = S.display.team;
+  $("teamBar").replaceChildren(h("span", { class: "lbl", text: `${S.order.length} player${S.order.length === 1 ? "" : "s"}` }), dispToggle("team"));
   const g = $("teamGrid"); g.replaceChildren();
   for (const id of S.order) {
     const p = S.players.get(id); const t = tiersOf(p);
@@ -474,7 +498,11 @@ function renderTeam(m) {
       onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(id); } } },
       h("div", { class: "card-head" }, h("h3", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" })),
       h("div", { class: "card-rows" }, TIERS.map(({ k }) => h("div", { class: "crow", style: tierVar(k) }, h("b", { text: lab(k) }),
-        t[k].length ? h("span", { text: t[k].join(", ") }) : h("span", { class: "none", text: "—" }))))));
+        !t[k].length ? h("span", { class: "none", text: "—" })
+        : mode === "names" ? h("span", { text: t[k].join(", ") })
+        : h("div", { class: "chips" }, t[k].map(c => mode === "icons"
+            ? monoEl(c, "md", c)
+            : h("span", { class: "mini", title: c }, monoEl(c, "sm"), h("span", { text: c })))))))));
   }
   renderHistory();
 }
@@ -489,7 +517,8 @@ function renderPlayer(m, pid) {
   $("boardHead").replaceChildren(
     h("div", { class: "who" }, h("h2", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" }),
       h("span", { class: "meta", text: `${total} champion${total === 1 ? "" : "s"} · ${t.S.length} in ${lab("S")}` })),
-    canEdit() ? h("button", { class: "btn ghost", type: "button", onclick: () => openPlayerDialog(pid), text: "Edit player" }) : null);
+    h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, dispToggle("player"),
+      canEdit() ? h("button", { class: "btn ghost", type: "button", onclick: () => openPlayerDialog(pid), text: "Edit player" }) : null));
   const trend = trendMap(pid); const wrap = $("tiers"); wrap.replaceChildren();
   for (const { k } of TIERS) {
     const cap = capOf(k);
@@ -510,9 +539,12 @@ function chip(pid, champ, tier, mv) {
     if (mv.from && mv.to) { const up = RANK[mv.to] < RANK[mv.from]; tr = h("span", { class: "trend " + (up ? "up" : "down"), title: `${up ? "Up" : "Down"} from ${lab(mv.from)}, ${rel(mv.at)}`, text: up ? "▲" : "▼" }); }
     else if (mv.to) tr = h("span", { class: "trend new", title: `Added ${rel(mv.at)}` });
   }
-  const b = h("button", { class: "chip" + (sel ? " is-sel" : ""), type: "button", draggable: editable ? "true" : null, "aria-pressed": editable ? (sel ? "true" : "false") : null,
-    dataset: { champ, tier }, title: editable ? "Select to move, or drag to another tier" : champ },
-    monoEl(champ), h("span", { class: "cname", text: champ }), tr);
+  const mode = S.display.player;
+  const b = h("button", { class: "chip" + (sel ? " is-sel" : "") + (mode === "icons" ? " icon-only" : mode === "names" ? " name-only" : ""), type: "button",
+    draggable: editable ? "true" : null, "aria-pressed": editable ? (sel ? "true" : "false") : null, "aria-label": mode === "icons" ? champ : null,
+    dataset: { champ, tier }, title: mode === "icons" ? (editable ? `${champ}: select to move, or drag to another tier` : champ) : (editable ? "Select to move, or drag to another tier" : champ) },
+    mode === "names" ? null : monoEl(champ, mode === "icons" ? "lg" : null),
+    mode === "icons" ? null : h("span", { class: "cname", text: champ }), tr);
   if (editable) {
     b.addEventListener("click", (e) => { e.stopPropagation(); S.sel = sel ? null : { pid, champ }; render(); });
     b.addEventListener("dragstart", (e) => { S.drag = { pid, champ }; try { e.dataTransfer.setData("text/plain", champ); e.dataTransfer.effectAllowed = "move"; } catch (x) {} b.classList.add("dragging"); });
@@ -834,11 +866,15 @@ function iconUrl(champ) {
   const f = ICONS.version && ICONS.files[norm(champ)];
   return f ? `${DDRAGON}/cdn/${ICONS.version}/img/champion/${f}` : null;
 }
-function monoEl(champ) {
-  const fallback = () => h("span", { class: "mono", style: `--h:${hue(champ)}`, "aria-hidden": "true", text: initials(champ) });
+function monoEl(champ, size, title) {
+  const cls = "mono" + (size ? " " + size : "");
+  const px = { sm: 20, md: 30, lg: 38 }[size] || 26;
+  // With a title (icon-only lists outside a button), the icon carries the champion's name for hover and screen readers.
+  const named = title ? { title, role: "img", "aria-label": title } : { "aria-hidden": "true" };
+  const fallback = () => h("span", { class: cls, style: `--h:${hue(champ)}`, ...named, text: initials(champ) });
   const url = iconUrl(champ);
   if (!url) return fallback();
-  const img = h("img", { class: "mono", src: url, alt: "", "aria-hidden": "true", loading: "lazy", decoding: "async", width: "26", height: "26", draggable: "false" });
+  const img = h("img", { class: cls, src: url, alt: title || "", title: title || null, "aria-hidden": title ? null : "true", loading: "lazy", decoding: "async", width: String(px), height: String(px), draggable: "false" });
   img.addEventListener("error", () => img.replaceWith(fallback()), { once: true });
   return img;
 }
@@ -890,6 +926,7 @@ function startListeners() {
 function boot() {
   loadChampionIcons();
   const saved = load("cb-view"); if (saved) S.view = saved;
+  for (const sc of ["team", "player"]) { const v = load("cb-disp-" + sc); if (DISP.some(d => d[0] === v)) S.display[sc] = v; }
   if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.startsWith("PASTE")) { S.configMissing = true; render(); return; }
   const app = initializeApp(FIREBASE_CONFIG);
   S.auth = getAuth(app); S.db = getFirestore(app);
