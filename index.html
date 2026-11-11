@@ -90,6 +90,21 @@ button { cursor: pointer; }
 
 .addchamp { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .addchamp input[type="text"] { flex: 1 1 180px; min-width: 0; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); }
+.picker { padding: 12px 18px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; background: var(--surface-2); }
+.pk-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.pk-roles { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.pk-roles button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; color: var(--muted); }
+.pk-roles button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pk-meta { font-size: 12px; color: var(--muted); display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; max-height: 320px; overflow-y: auto; padding: 2px; }
+.pk-group { grid-column: 1 / -1; font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 6px 2px 0; }
+.pk-tile { position: relative; display: grid; justify-items: center; gap: 3px; padding: 6px 3px 5px; border-radius: 8px; border: 1px solid transparent; background: transparent; min-width: 0; }
+.pk-tile:hover { background: var(--surface); border-color: var(--line); }
+.pk-tile .pk-name { font-size: 11px; line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-tile.on .mono, .pk-tile.on .pk-name { opacity: .45; }
+.pk-badge { position: absolute; top: 2px; right: 6px; min-width: 18px; padding: 0 4px; border-radius: 4px; background: var(--tc); color: var(--tier-ink); font-family: var(--f-display); font-weight: 700; font-size: 12px; line-height: 17px; text-align: center; }
+.pk-empty { grid-column: 1 / -1; color: var(--muted); padding: 10px 2px; }
+.mono.xl { width: 42px; height: 42px; font-size: 15px; border-radius: 7px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); position: relative; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label { padding: 7px 10px; font-family: var(--f-display); font-weight: 700; font-size: 15px; cursor: pointer; border-left: 1px solid var(--line); min-width: 34px; text-align: center; }
@@ -188,6 +203,23 @@ img.mono { object-fit: cover; background: var(--surface-2); display: block; }
 .dialog { width: min(440px, 100%); padding: 20px; display: grid; gap: 14px; }
 .dialog h2 { font-family: var(--f-display); font-weight: 700; font-size: 24px; margin: 0; text-transform: uppercase; }
 .dialog p { margin: 0; color: var(--muted); }
+.dialog.wide { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; }
+.ex-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ex-tools .lbl { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.ex-list { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; max-height: 46vh; overflow-y: auto; }
+.ex-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; }
+.ex-row + .ex-row { border-top: 1px solid var(--line); }
+.ex-row.off .ex-name { opacity: .5; }
+.ex-row label { display: flex; align-items: baseline; gap: 8px; min-width: 0; cursor: pointer; flex-wrap: wrap; }
+.ex-row .ex-name { font-weight: 600; overflow-wrap: anywhere; }
+.ex-row .ex-num { font-family: var(--f-mono); font-size: 11px; color: var(--muted); min-width: 16px; font-variant-numeric: tabular-nums; }
+.ex-move { display: inline-flex; gap: 4px; }
+.ex-move button { width: 30px; height: 28px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; }
+.ex-move button:disabled { opacity: .3; cursor: default; }
+.ex-opts { display: flex; gap: 18px; flex-wrap: wrap; }
+.ex-opts fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.ex-opts legend { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.ex-opts label { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
 .row-end { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .row-split { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
 
@@ -292,8 +324,14 @@ const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support", "Flex"];
 const ROLE_ABBR = { Top: "Top", Jungle: "Jg", Mid: "Mid", Bot: "Bot", Support: "Sup", Flex: "Flex" };
 const CHAMPS = ["Aatrox","Ahri","Akali","Akshan","Alistar","Ambessa","Amumu","Anivia","Annie","Aphelios","Ashe","Aurelion Sol","Aurora","Azir","Bard","Bel'Veth","Blitzcrank","Brand","Braum","Briar","Caitlyn","Camille","Cassiopeia","Cho'Gath","Corki","Darius","Diana","Dr. Mundo","Draven","Ekko","Elise","Evelynn","Ezreal","Fiddlesticks","Fiora","Fizz","Galio","Gangplank","Garen","Gnar","Gragas","Graves","Gwen","Hecarim","Heimerdinger","Hwei","Illaoi","Irelia","Ivern","Janna","Jarvan IV","Jax","Jayce","Jhin","Jinx","K'Sante","Kai'Sa","Kalista","Karma","Karthus","Kassadin","Katarina","Kayle","Kayn","Kennen","Kha'Zix","Kindred","Kled","Kog'Maw","LeBlanc","Lee Sin","Leona","Lillia","Lissandra","Lucian","Lulu","Lux","Malphite","Malzahar","Maokai","Master Yi","Mel","Milio","Miss Fortune","Mordekaiser","Morgana","Naafiri","Nami","Nasus","Nautilus","Neeko","Nidalee","Nilah","Nocturne","Nunu & Willump","Olaf","Orianna","Ornn","Pantheon","Poppy","Pyke","Qiyana","Quinn","Rakan","Rammus","Rek'Sai","Rell","Renata Glasc","Renekton","Rengar","Riven","Rumble","Ryze","Samira","Sejuani","Senna","Seraphine","Sett","Shaco","Shen","Shyvana","Singed","Sion","Sivir","Skarner","Smolder","Sona","Soraka","Swain","Sylas","Syndra","Tahm Kench","Taliyah","Talon","Taric","Teemo","Thresh","Tristana","Trundle","Tryndamere","Twisted Fate","Twitch","Udyr","Urgot","Varus","Vayne","Veigar","Vel'Koz","Vex","Vi","Viego","Viktor","Vladimir","Volibear","Warwick","Wukong","Xayah","Xerath","Xin Zhao","Yasuo","Yone","Yorick","Yunara","Yuumi","Zac","Zed","Zeri","Ziggs","Zilean","Zoe","Zyra"];
 
+// Commonly played positions (first is the most common). T=Top J=Jungle M=Mid B=Bot S=Support.
+const ROLE_CODES = { T: "Top", J: "Jungle", M: "Mid", B: "Bot", S: "Support" };
+const CHAMP_ROLES = {"Aatrox":"T","Ahri":"M","Akali":"MT","Akshan":"MT","Alistar":"S","Ambessa":"TJ","Amumu":"JS","Anivia":"M","Annie":"MS","Aphelios":"B","Ashe":"BS","Aurelion Sol":"M","Aurora":"MT","Azir":"M","Bard":"S","Bel'Veth":"J","Blitzcrank":"S","Brand":"SMJ","Braum":"S","Briar":"J","Caitlyn":"B","Camille":"T","Cassiopeia":"MT","Cho'Gath":"TM","Corki":"M","Darius":"T","Diana":"JM","Dr. Mundo":"TJ","Draven":"B","Ekko":"JM","Elise":"JS","Evelynn":"J","Ezreal":"B","Fiddlesticks":"JS","Fiora":"T","Fizz":"M","Galio":"MS","Gangplank":"T","Garen":"T","Gnar":"T","Gragas":"JT","Graves":"J","Gwen":"TJ","Hecarim":"J","Heimerdinger":"MTS","Hwei":"MS","Illaoi":"T","Irelia":"TM","Ivern":"J","Janna":"S","Jarvan IV":"J","Jax":"TJ","Jayce":"TM","Jhin":"B","Jinx":"B","K'Sante":"T","Kai'Sa":"B","Kalista":"B","Karma":"SM","Karthus":"J","Kassadin":"M","Katarina":"M","Kayle":"TM","Kayn":"J","Kennen":"T","Kha'Zix":"J","Kindred":"J","Kled":"T","Kog'Maw":"B","LeBlanc":"M","Lee Sin":"J","Leona":"S","Lillia":"J","Lissandra":"M","Lucian":"BM","Lulu":"S","Lux":"SM","Malphite":"TS","Malzahar":"M","Maokai":"SJT","Master Yi":"J","Mel":"MS","Milio":"S","Miss Fortune":"B","Mordekaiser":"T","Morgana":"S","Naafiri":"MJ","Nami":"S","Nasus":"T","Nautilus":"S","Neeko":"MS","Nidalee":"J","Nilah":"B","Nocturne":"J","Nunu & Willump":"J","Olaf":"TJ","Orianna":"M","Ornn":"T","Pantheon":"TSM","Poppy":"TJS","Pyke":"S","Qiyana":"MJ","Quinn":"T","Rakan":"S","Rammus":"J","Rek'Sai":"J","Rell":"S","Renata Glasc":"S","Renekton":"T","Rengar":"JT","Riven":"T","Rumble":"T","Ryze":"MT","Samira":"B","Sejuani":"J","Senna":"SB","Seraphine":"SBM","Sett":"TS","Shaco":"JS","Shen":"TS","Shyvana":"J","Singed":"T","Sion":"T","Sivir":"B","Skarner":"JT","Smolder":"B","Sona":"S","Soraka":"S","Swain":"SMB","Sylas":"MJ","Syndra":"M","Tahm Kench":"TS","Taliyah":"JM","Talon":"MJ","Taric":"S","Teemo":"T","Thresh":"S","Tristana":"BM","Trundle":"JT","Tryndamere":"T","Twisted Fate":"M","Twitch":"BJ","Udyr":"JT","Urgot":"T","Varus":"B","Vayne":"BT","Veigar":"M","Vel'Koz":"SM","Vex":"M","Vi":"J","Viego":"J","Viktor":"M","Vladimir":"MT","Volibear":"TJ","Warwick":"JT","Wukong":"JT","Xayah":"B","Xerath":"SM","Xin Zhao":"J","Yasuo":"MT","Yone":"MT","Yorick":"T","Yunara":"B","Yuumi":"S","Zac":"J","Zed":"M","Zeri":"B","Ziggs":"BM","Zilean":"SM","Zoe":"M","Zyra":"S"};
+const ROLE_BY_NORM = Object.fromEntries(Object.entries(CHAMP_ROLES).map(([n, r]) => [n.toLowerCase().replace(/[^a-z0-9]/g, ""), [...r].map(c => ROLE_CODES[c])]));
+const rolesOf = (champ) => ROLE_BY_NORM[champ.toLowerCase().replace(/[^a-z0-9]/g, "")] || [];
+
 const S = {
-  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null, display: { team: "both", player: "both" },
+  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null, display: { team: "both", player: "both" }, pick: { q: "", role: "All", open: true },
   configMissing: false, error: null, loaded: false, stalled: false, gotPlayers: false,
   players: new Map(), order: [], moves: [],
   view: null, sel: null, drag: null, histScope: "player", addTier: "B",
@@ -422,6 +460,7 @@ function renderStatus() {
 function renderMe() {
   const el = $("me"); el.replaceChildren();
   if (S.configMissing || !S.myId) return;
+  if (S.order.length) el.append(h("button", { class: "btn small", type: "button", text: "Export PDF", onclick: openExportDialog }));
   if (canEdit()) {
     el.append(h("span", {}, S.owner ? "Owner: " : "Editing as ", h("b", { text: S.myName || "you" })));
     el.append(h("button", { class: "btn small" + (S.owner ? "" : " ghost"), type: "button", text: "Owner settings", "aria-pressed": S.view === "settings" ? "true" : null,
@@ -528,7 +567,7 @@ function renderPlayer(m, pid) {
     wireZone(zone, pid, k);
     wrap.append(h("div", { class: "tier", style: tierVar(k) }, h("div", { class: "tier-label" }, labEl(k), cap ? h("small", { text: cap }) : null), zone));
   }
-  if (canEdit()) refreshDatalist(pid);
+  if (canEdit()) renderPicker(pid);
   renderHistory();
 }
 
@@ -574,25 +613,74 @@ function trendMap(pid) {
 }
 
 function addChampForm(pid) {
-  const input = h("input", { id: "ac-name", type: "text", list: "ac-list", placeholder: "Add a champion…", autocomplete: "off", "aria-label": "Champion name", maxlength: "24" });
-  const seg = h("div", { class: "seg", role: "radiogroup", "aria-label": "Tier" });
+  const input = h("input", { id: "ac-name", type: "search", placeholder: "Search or add a champion…", autocomplete: "off", "aria-label": "Search champions", maxlength: "24", value: S.pick.q || null,
+    oninput: (e) => { S.pick.q = e.target.value; renderPicker(pid); } });
+  const seg = h("div", { class: "seg", role: "radiogroup", "aria-label": "Tier to add to" });
   for (const { k } of TIERS) seg.append(
-    h("input", { type: "radio", name: "ac-tier", id: "ac-tier-" + k, value: k, checked: S.addTier === k ? true : null, onchange: () => { S.addTier = k; } }),
+    h("input", { type: "radio", name: "ac-tier", id: "ac-tier-" + k, value: k, checked: S.addTier === k ? true : null, onchange: () => { S.addTier = k; renderPicker(pid); } }),
     h("label", { for: "ac-tier-" + k, style: tierVar(k), text: lab(k) }));
-  const f = h("form", { class: "addchamp" }, input, h("datalist", { id: "ac-list" }), seg, h("button", { class: "btn primary", type: "submit", text: "Add" }));
+  const toggle = h("button", { class: "btn ghost", type: "button", id: "pk-toggle", "aria-expanded": S.pick.open ? "true" : "false", "aria-controls": "picker",
+    text: S.pick.open ? "Hide champions" : "Browse champions",
+    onclick: () => { S.pick.open = !S.pick.open; store("cb-pick-open", S.pick.open ? "1" : "0"); toggle.setAttribute("aria-expanded", String(S.pick.open)); toggle.textContent = S.pick.open ? "Hide champions" : "Browse champions"; $("picker").hidden = !S.pick.open; renderPicker(pid); } });
+  const f = h("form", { class: "addchamp" }, input, seg, h("button", { class: "btn primary", type: "submit", text: "Add" }), toggle);
   f.addEventListener("submit", (e) => {
     e.preventDefault(); const raw = input.value.trim(); if (!raw) { input.focus(); return; }
-    const name = canonical(raw); const cur = findTier(S.players.get(pid), name); const to = S.addTier;
-    if (cur === to) toast(`${name} is already in ${lab(to)}.`);
-    else { moveChamp(pid, name, to); if (cur) toast(`${name} moved from ${lab(cur)} to ${lab(to)}.`); }
-    input.value = ""; input.focus();
+    // Exact name first, then the top search result, otherwise add the typed name as a custom champion.
+    const exact = CHAMPS.find(c => norm(c) === norm(raw));
+    const hits = pickerResults(pid);
+    addFromPicker(pid, exact || (hits.length ? hits[0] : canonical(raw)));
+    input.value = ""; S.pick.q = ""; renderPicker(pid); input.focus();
   });
-  return f;
+  const picker = h("div", { id: "picker", class: "picker", hidden: S.pick.open ? null : true },
+    h("div", { class: "pk-tools" },
+      h("div", { id: "pk-roles", class: "pk-roles", role: "group", "aria-label": "Filter by role" }),
+      h("span", { id: "pk-meta", class: "pk-meta" })),
+    h("div", { id: "pk-grid", class: "pk-grid", role: "list", "aria-label": "Champions" }));
+  return [f, picker];
 }
-function refreshDatalist(pid) {
-  const dl = $("ac-list"); if (!dl) return;
-  const have = new Set(Object.values(tiersOf(S.players.get(pid))).flat());
-  dl.replaceChildren(...CHAMPS.filter(c => !have.has(c)).map(c => h("option", { value: c })));
+function addFromPicker(pid, champ) {
+  const cur = findTier(S.players.get(pid), champ); const to = S.addTier;
+  if (cur === to) { toast(`${champ} is already in ${lab(to)}.`); return; }
+  moveChamp(pid, champ, to);
+  toast(cur ? `${champ} moved from ${lab(cur)} to ${lab(to)}.` : `${champ} added to ${lab(to)}.`);
+}
+function pickerResults(pid) {
+  const q = norm(S.pick.q || "");
+  return CHAMPS.filter(c => (!q || norm(c).includes(q)) && (S.pick.role === "All" || rolesOf(c).includes(S.pick.role)));
+}
+function renderPicker(pid) {
+  const grid = $("pk-grid"); if (!grid || !S.pick.open) return;
+  const p = S.players.get(pid); if (!p) return;
+  const where = {}; const t = tiersOf(p); for (const { k } of TIERS) for (const c of t[k]) where[c] = k;
+  const roles = ["All", ...Object.values(ROLE_CODES)];
+  $("pk-roles").replaceChildren(...roles.map(r => h("button", { type: "button", "aria-pressed": S.pick.role === r ? "true" : "false", text: r,
+    onclick: () => { S.pick.role = r; renderPicker(pid); } })));
+  const hits = pickerResults(pid);
+  $("pk-meta").replaceChildren(h("span", { text: `${hits.length} champion${hits.length === 1 ? "" : "s"}` }),
+    h("span", {}, "Click to add to ", tp(S.addTier)));
+  const tile = (c) => {
+    const k = where[c];
+    const b = h("button", { class: "pk-tile" + (k ? " on" : ""), type: "button", role: "listitem", draggable: "true",
+      "aria-label": k ? `${c}, in ${lab(k)}. Move to ${lab(S.addTier)}` : `Add ${c} to ${lab(S.addTier)}`,
+      title: [c, rolesOf(c).join(" / ")].filter(Boolean).join(" · "),
+      onclick: () => addFromPicker(pid, c) },
+      monoEl(c, "xl"), h("span", { class: "pk-name", text: c }),
+      k ? h("span", { class: "pk-badge", style: tierVar(k), text: lab(k) }) : null);
+    b.addEventListener("dragstart", (e) => { S.drag = { pid, champ: c }; try { e.dataTransfer.setData("text/plain", c); e.dataTransfer.effectAllowed = "copyMove"; } catch (x) {} });
+    b.addEventListener("dragend", () => { S.drag = null; document.querySelectorAll(".zone.over").forEach(z => z.classList.remove("over")); });
+    return b;
+  };
+  const kids = [];
+  if (!hits.length) kids.push(h("p", { class: "pk-empty", text: S.pick.q ? `No champion matches "${S.pick.q}". Press Add to add it as typed.` : "No champions for this role." }));
+  else if (S.pick.role === "All" && !S.pick.q) {
+    // Grouped by each champion's most common position.
+    for (const r of [...Object.values(ROLE_CODES), "Other"]) {
+      const group = hits.filter(c => (rolesOf(c)[0] || "Other") === r);
+      if (!group.length) continue;
+      kids.push(h("div", { class: "pk-group", text: r }), ...group.map(tile));
+    }
+  } else kids.push(...hits.map(tile));
+  const top = grid.scrollTop; grid.replaceChildren(...kids); grid.scrollTop = top;
 }
 
 function historyPanel(teamOnly) {
@@ -858,6 +946,173 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("click", (e) => { if (S.sel && !e.target.closest(".zone, .chip, .actionbar, .overlay, .toast")) { S.sel = null; render(); } });
 setInterval(() => { document.querySelectorAll(".hist-list time").forEach(t => { t.textContent = rel(Date.parse(t.getAttribute("datetime"))); }); }, 60000);
 
+/* ---------- PDF export ---------- */
+function loadExportPrefs() {
+  let pr = {}; try { pr = JSON.parse(load("cb-export") || "{}") || {}; } catch (e) {}
+  const saved = Array.isArray(pr.order) ? pr.order.filter(id => S.players.has(id)) : [];
+  const order = saved.concat(S.order.filter(id => !saved.includes(id)));
+  const off = new Set(Array.isArray(pr.off) ? pr.off : []);
+  return { rows: order.map(id => ({ id, on: !off.has(id) })), perPage: !!pr.perPage, paper: pr.paper === "a4" ? "a4" : "letter" };
+}
+function saveExportPrefs(st) {
+  store("cb-export", JSON.stringify({ order: st.rows.map(r => r.id), off: st.rows.filter(r => !r.on).map(r => r.id), perPage: st.perPage, paper: st.paper }));
+}
+function openExportDialog() {
+  if (!S.order.length) return;
+  const st = loadExportPrefs();
+  const list = h("div", { class: "ex-list", role: "list" });
+  const count = h("span", { class: "lbl" });
+  const status = h("p", { class: "form-err", hidden: true });
+  const go = h("button", { class: "btn primary", type: "button", text: "Export PDF" });
+  const drawList = (focusId, focusDir) => {
+    list.replaceChildren();
+    let n = 0;
+    st.rows.forEach((r, i) => {
+      const p = S.players.get(r.id); if (r.on) n++;
+      const cb = h("input", { type: "checkbox", id: "ex-" + r.id, checked: r.on ? true : null,
+        onchange: (e) => { r.on = e.target.checked; drawList(); } });
+      list.append(h("div", { class: "ex-row" + (r.on ? "" : " off"), role: "listitem" }, cb,
+        h("label", { for: "ex-" + r.id }, h("span", { class: "ex-num", text: r.on ? String(n) : "" }), h("span", { class: "ex-name", text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" })),
+        h("div", { class: "ex-move" },
+          h("button", { type: "button", "aria-label": `Move ${p.name} up`, id: `ex-up-${r.id}`, disabled: i === 0 ? true : null, text: "▲",
+            onclick: () => { [st.rows[i - 1], st.rows[i]] = [st.rows[i], st.rows[i - 1]]; drawList(r.id, "up"); } }),
+          h("button", { type: "button", "aria-label": `Move ${p.name} down`, id: `ex-dn-${r.id}`, disabled: i === st.rows.length - 1 ? true : null, text: "▼",
+            onclick: () => { [st.rows[i + 1], st.rows[i]] = [st.rows[i], st.rows[i + 1]]; drawList(r.id, "dn"); } }))));
+    });
+    count.textContent = `${n} of ${st.rows.length} players · in this order`;
+    go.disabled = n === 0 ? true : false;
+    if (focusId) { const b = $(`ex-${focusDir}-${focusId}`); const alt = $(`ex-${focusDir === "up" ? "dn" : "up"}-${focusId}`); (b && !b.disabled ? b : alt)?.focus(); }
+  };
+  const radio = (name, value, label, checked, onPick) => h("label", {}, h("input", { type: "radio", name, value, checked: checked ? true : null, onchange: onPick }), label);
+  const opts = h("div", { class: "ex-opts" },
+    h("fieldset", {}, h("legend", { text: "Layout" }),
+      radio("ex-layout", "flow", "Continuous", !st.perPage, () => { st.perPage = false; }),
+      radio("ex-layout", "page", "One player per page", st.perPage, () => { st.perPage = true; })),
+    h("fieldset", {}, h("legend", { text: "Paper" }),
+      radio("ex-paper", "letter", "US Letter", st.paper === "letter", () => { st.paper = "letter"; }),
+      radio("ex-paper", "a4", "A4", st.paper === "a4", () => { st.paper = "a4"; })));
+  go.addEventListener("click", async () => {
+    const ids = st.rows.filter(r => r.on).map(r => r.id); if (!ids.length) return;
+    saveExportPrefs(st);
+    go.disabled = true; go.textContent = "Building PDF…"; status.hidden = true;
+    try {
+      const doc = await buildPdf(ids, st);
+      doc.save(`comfort-board-${new Date().toISOString().slice(0, 10)}.pdf`);
+      closeOverlay(); toast(`PDF exported with ${ids.length} player${ids.length === 1 ? "" : "s"}.`);
+    } catch (e) {
+      console.error(e);
+      status.textContent = "Couldn't build the PDF. Check your connection (the PDF tool loads on first use) and try again.";
+      status.hidden = false; go.disabled = false; go.textContent = "Export PDF";
+    }
+  });
+  drawList();
+  showOverlay(h("div", { class: "panel dialog wide", role: "dialog", "aria-modal": "true", "aria-label": "Export PDF" },
+    h("h2", { text: "Export PDF" }),
+    h("p", { text: "Tick the players to include and use the arrows to set their order in the PDF." }),
+    h("div", { class: "ex-tools" }, count, h("div", { style: "display:flex;gap:4px" },
+      h("button", { class: "btn ghost small", type: "button", text: "Select all", onclick: () => { st.rows.forEach(r => r.on = true); drawList(); } }),
+      h("button", { class: "btn ghost small", type: "button", text: "Clear", onclick: () => { st.rows.forEach(r => r.on = false); drawList(); } }),
+      h("button", { class: "btn ghost small", type: "button", text: "Roster order", title: "Put players back in roster order",
+        onclick: () => { st.rows.sort((a, b) => S.order.indexOf(a.id) - S.order.indexOf(b.id)); drawList(); } }))),
+    list, opts, status,
+    h("div", { class: "row-end" }, h("button", { class: "btn ghost", type: "button", text: "Cancel", onclick: closeOverlay }), go)));
+}
+
+let jsPdfPromise = null;
+function loadJsPdf() {
+  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf);
+  if (!jsPdfPromise) jsPdfPromise = new Promise((resolve, reject) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    sc.onload = () => window.jspdf ? resolve(window.jspdf) : reject(new Error("jsPDF missing"));
+    sc.onerror = () => { jsPdfPromise = null; reject(new Error("jsPDF failed to load")); };
+    document.head.append(sc);
+  });
+  return jsPdfPromise;
+}
+const PDF_TIER = { S: "#c48f22", A: "#2f8f80", B: "#3f6fbf", C: "#7d63ae", D: "#7b8291" };
+const hexRgb = (x) => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16));
+function hslRgb(hh, ss, ll) {
+  ss /= 100; ll /= 100; const k = n => (n + hh / 30) % 12; const a = ss * Math.min(ll, 1 - ll);
+  const f = n => ll - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0), f(8), f(4)].map(v => Math.round(v * 255));
+}
+// The PDF's built-in fonts only cover Western characters; swap the few others we use.
+const pdfText = (x) => String(x).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-");
+async function buildPdf(ids, opts) {
+  const { jsPDF } = await loadJsPdf();
+  const doc = new jsPDF({ unit: "pt", format: opts.paper || "letter" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40, BOTTOM = H - M - 14;
+  const INK = [19, 26, 39], MUTED = [90, 100, 119], LINE = [211, 217, 227];
+  const LABEL_W = 56, CH = 20, GAP = 5, AREA_X = M + LABEL_W + 8, AREA_W = W - 2 * M - LABEL_W - 16;
+  const dateStr = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  let y = M;
+  const font = (style, size, color) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(...color); };
+  const fit = (txt, max) => { txt = pdfText(txt); if (doc.getTextWidth(txt) <= max) return txt; while (txt.length > 1 && doc.getTextWidth(txt + "...") > max) txt = txt.slice(0, -1); return txt + "..."; };
+  const pageHeader = (first) => {
+    if (first) { font("bold", 20, INK); doc.text("COMFORT BOARD", M, y + 16); font("normal", 9, MUTED); doc.text(dateStr, W - M, y + 16, { align: "right" }); y += 36; }
+    else { font("bold", 10, MUTED); doc.text("Comfort Board", M, y + 8); font("normal", 8.5, MUTED); doc.text(dateStr, W - M, y + 8, { align: "right" }); y += 22; }
+  };
+  const newPage = () => { doc.addPage(); y = M; pageHeader(false); };
+  const layoutChips = (champs) => {
+    font("normal", 9.5, INK);
+    const lines = [[]]; let x = 0;
+    for (const c of champs) {
+      const w = Math.min(22 + doc.getTextWidth(pdfText(c)) + 8, AREA_W);
+      if (x > 0 && x + w > AREA_W) { lines.push([]); x = 0; }
+      lines[lines.length - 1].push({ c, x, w }); x += w + GAP;
+    }
+    return lines;
+  };
+  pageHeader(true);
+  ids.forEach((pid, idx) => {
+    const p = S.players.get(pid); if (!p) return;
+    const t = tiersOf(p);
+    const rows = TIERS.map(({ k }) => {
+      const lines = t[k].length ? layoutChips(t[k]) : null;
+      return { k, lines, hgt: Math.max(44, (lines ? lines.length : 1) * (CH + GAP) - GAP + 16) };
+    });
+    const blockH = 26 + rows.reduce((a, r) => a + r.hgt, 0);
+    if (opts.perPage ? idx > 0 : (y + blockH > BOTTOM && y > M + 60)) newPage();
+    const title = (cont) => {
+      font("bold", 15, INK); const nm = fit((p.name || "Unnamed").toUpperCase() + (cont ? " (CONT.)" : ""), W - 2 * M - 160);
+      doc.text(nm, M, y + 13); const nw = doc.getTextWidth(nm);
+      const n = champCount(p);
+      font("normal", 9, MUTED); doc.text(pdfText(`${p.role || ""}${p.role ? "  ·  " : ""}${n} champion${n === 1 ? "" : "s"}`), M + nw + 10, y + 13);
+      y += 24;
+    };
+    title(false);
+    for (const r of rows) {
+      if (y + r.hgt > BOTTOM) { newPage(); title(true); }
+      const cap = capOf(r.k), L = lab(r.k);
+      doc.setFillColor(...hexRgb(PDF_TIER[r.k])); doc.rect(M, y, LABEL_W, r.hgt, "F");
+      font("bold", L.length >= 3 ? 13 : 20, [255, 255, 255]);
+      doc.text(pdfText(L), M + LABEL_W / 2, y + r.hgt / 2 + (cap ? 2 : 7), { align: "center" });
+      if (cap) { font("normal", 6.3, [255, 255, 255]); doc.text(fit(cap.toUpperCase(), LABEL_W - 6), M + LABEL_W / 2, y + r.hgt / 2 + 12, { align: "center" }); }
+      doc.setDrawColor(...LINE); doc.setLineWidth(0.6); doc.rect(M + LABEL_W, y, W - 2 * M - LABEL_W, r.hgt, "S");
+      if (!r.lines) { font("normal", 9, MUTED); doc.text("-", AREA_X + 2, y + r.hgt / 2 + 3); }
+      else {
+        let ly = y + 8;
+        for (const ln of r.lines) {
+          for (const it of ln) {
+            const x0 = AREA_X + it.x;
+            doc.setDrawColor(...LINE); doc.setFillColor(255, 255, 255); doc.roundedRect(x0, ly, it.w, CH, 3, 3, "FD");
+            doc.setFillColor(...hslRgb(hue(it.c), 45, 42)); doc.roundedRect(x0 + 3, ly + 3, 14, 14, 2, 2, "F");
+            font("bold", 6.5, [255, 255, 255]); doc.text(pdfText(initials(it.c)), x0 + 10, ly + 12.4, { align: "center" });
+            font("normal", 9.5, INK); doc.text(fit(it.c, it.w - 30), x0 + 22, ly + 13.6);
+          }
+          ly += CH + GAP;
+        }
+      }
+      y += r.hgt;
+    }
+    y += 24;
+  });
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); font("normal", 8, MUTED); doc.text(`Page ${i} of ${n}`, W - M, H - 24, { align: "right" }); }
+  return doc;
+}
+
 /* ---------- champion icons (Riot Data Dragon) ---------- */
 // name (normalized) -> image filename, e.g. "wukong" -> "MonkeyKing.png"
 const ICONS = { version: null, files: {} };
@@ -926,6 +1181,7 @@ function startListeners() {
 function boot() {
   loadChampionIcons();
   const saved = load("cb-view"); if (saved) S.view = saved;
+  if (load("cb-pick-open") === "0") S.pick.open = false;
   for (const sc of ["team", "player"]) { const v = load("cb-disp-" + sc); if (DISP.some(d => d[0] === v)) S.display[sc] = v; }
   if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.startsWith("PASTE")) { S.configMissing = true; render(); return; }
   const app = initializeApp(FIREBASE_CONFIG);
