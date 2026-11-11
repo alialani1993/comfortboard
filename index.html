@@ -133,6 +133,17 @@ img.mono { object-fit: cover; background: var(--surface-2); display: block; }
 .fine { color: var(--muted); font-size: 11.5px; max-width: 80ch; margin: 8px 0 0; }
 .cname { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .trend { font-size: 10px; line-height: 1; flex: none; }
+.prac { width: 15px; height: 15px; flex: none; color: var(--accent); display: inline-grid; place-items: center; }
+.prac svg { width: 100%; height: 100%; display: block; }
+.chip.practice { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.chip.icon-only .prac { position: absolute; bottom: -5px; left: -5px; background: var(--surface); border-radius: 50%; width: 17px; height: 17px; padding: 1px; }
+.mini .prac { width: 12px; height: 12px; }
+.mini.practice { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.ico-wrap { position: relative; display: inline-block; }
+.ico-wrap .prac { position: absolute; bottom: -4px; right: -4px; width: 14px; height: 14px; background: var(--surface); border-radius: 50%; padding: 1px; }
+.prac-txt { text-decoration: underline dotted var(--accent); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.prac-legend { display: inline-flex; align-items: center; gap: 4px; }
+.ab-prac[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .trend.up { color: var(--up-ink); }
 .trend.down { color: var(--down-ink); }
 .trend.new { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
@@ -408,6 +419,20 @@ function onWriteError(e) {
     toast("Editing access was refused. The passcode may have changed, so unlock again.");
   } else toast("That change didn't save. Check your connection and try again.");
 }
+/* ---------- practice marks (owner) ---------- */
+// An original target-style glyph used as the practice badge.
+const PRAC_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="2.4" fill="currentColor"/></svg>';
+function pracEl() { const e = h("span", { class: "prac", "aria-hidden": "true" }); e.innerHTML = PRAC_SVG; return e; }
+function isPractice(p, champ) { return !!(p && Array.isArray(p.practice) && p.practice.includes(champ)); }
+function practiceCount(p) { if (!p || !Array.isArray(p.practice)) return 0; const on = new Set(Object.values(tiersOf(p)).flat()); return p.practice.filter(c => on.has(c)).length; }
+function togglePractice(pid, champ) {
+  const p = S.players.get(pid); if (!p || !S.owner) return;
+  const cur = Array.isArray(p.practice) ? p.practice.slice() : [];
+  const was = cur.includes(champ);
+  const next = was ? cur.filter(c => c !== champ) : cur.concat(champ);
+  enqueue(() => updateDoc(doc(S.db, "players", pid), { practice: next, updatedAt: Date.now(), updatedBy: S.myId }));
+  toast(was ? `${champ} no longer marked for practice.` : `${champ} marked for practice.`);
+}
 function moveChamp(pid, champ, to, before) {
   const p = S.players.get(pid); if (!p || !canEdit()) return;
   const orig = tiersOf(p); const t = tiersOf(p); const from = findTier(p, champ);
@@ -417,6 +442,7 @@ function moveChamp(pid, champ, to, before) {
   const patch = { updatedAt: Date.now(), updatedBy: S.myId };
   if (from) patch["tiers." + from] = t[from];
   if (to) patch["tiers." + to] = t[to];
+  if (!to && S.owner && isPractice(p, champ)) patch.practice = (p.practice || []).filter(c => c !== champ);
   const batch = writeBatch(S.db);
   batch.update(doc(S.db, "players", pid), patch);
   if (from !== to) batch.set(doc(collection(S.db, "moves")), { player: pid, champ, from: from || null, to: to || null, by: S.myId, byName: S.myName || "", at: Date.now() });
@@ -551,10 +577,10 @@ function renderTeam(m) {
       h("div", { class: "card-head" }, h("h3", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" })),
       h("div", { class: "card-rows" }, TIERS.map(({ k }) => h("div", { class: "crow", style: tierVar(k) }, h("b", { text: lab(k) }),
         !t[k].length ? h("span", { class: "none", text: "—" })
-        : mode === "names" ? h("span", { text: t[k].join(", ") })
+        : mode === "names" ? h("span", {}, t[k].flatMap((c, i) => [i ? ", " : null, isPractice(p, c) ? h("span", { class: "prac-txt", title: `${c}: marked for practice`, text: c }) : c]))
         : h("div", { class: "chips" }, t[k].map(c => mode === "icons"
-            ? monoEl(c, "md", c)
-            : h("span", { class: "mini", title: c }, monoEl(c, "sm"), h("span", { text: c })))))))));
+            ? (isPractice(p, c) ? h("span", { class: "ico-wrap" }, monoEl(c, "md", `${c} (practice)`), pracEl()) : monoEl(c, "md", c))
+            : h("span", { class: "mini" + (isPractice(p, c) ? " practice" : ""), title: isPractice(p, c) ? `${c}: marked for practice` : c }, monoEl(c, "sm"), h("span", { text: c }), isPractice(p, c) ? pracEl() : null))))))));
   }
   renderHistory();
 }
@@ -568,7 +594,8 @@ function renderPlayer(m, pid) {
   const p = S.players.get(pid); const t = tiersOf(p); const total = champCount(p);
   $("boardHead").replaceChildren(
     h("div", { class: "who" }, h("h2", { text: p.name || "Unnamed" }), h("span", { class: "pill", text: p.role || "" }),
-      h("span", { class: "meta", text: `${total} champion${total === 1 ? "" : "s"} · ${t.S.length} in ${lab("S")}` })),
+      h("span", { class: "meta" }, `${total} champion${total === 1 ? "" : "s"} · ${t.S.length} in ${lab("S")}`,
+        practiceCount(p) ? [" · ", h("span", { class: "prac-legend" }, pracEl(), `${practiceCount(p)} to practice`)] : null)),
     h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, dispToggle("player"),
       canEdit() ? h("button", { class: "btn ghost", type: "button", onclick: () => openPlayerDialog(pid), text: "Edit player" }) : null));
   const trend = trendMap(pid); const wrap = $("tiers"); wrap.replaceChildren();
@@ -585,6 +612,7 @@ function renderPlayer(m, pid) {
 }
 
 function chip(pid, champ, tier, mv) {
+  const p0 = S.players.get(pid);
   const sel = S.sel && S.sel.pid === pid && S.sel.champ === champ; const editable = canEdit();
   let tr = null;
   if (mv) {
@@ -596,7 +624,8 @@ function chip(pid, champ, tier, mv) {
     draggable: editable ? "true" : null, "aria-pressed": editable ? (sel ? "true" : "false") : null, "aria-label": mode === "icons" ? champ : null,
     dataset: { champ, tier }, title: mode === "icons" ? (editable ? `${champ}: select to move, or drag to another tier` : champ) : (editable ? "Select to move, or drag to another tier" : champ) },
     mode === "names" ? null : monoEl(champ, mode === "icons" ? "lg" : null),
-    mode === "icons" ? null : h("span", { class: "cname", text: champ }), tr);
+    mode === "icons" ? null : h("span", { class: "cname", text: champ }), tr, isPractice(p0, champ) ? pracEl() : null);
+  if (isPractice(p0, champ)) { b.classList.add("practice"); b.title = `${champ}: marked for practice` + (editable ? ". Select to move, or drag to another tier" : ""); }
   if (editable) {
     b.addEventListener("click", (e) => { e.stopPropagation(); S.sel = sel ? null : { pid, champ }; render(); });
     b.addEventListener("dragstart", (e) => { S.drag = { pid, champ }; try { e.dataTransfer.setData("text/plain", champ); e.dataTransfer.effectAllowed = "move"; } catch (x) {} b.classList.add("dragging"); });
@@ -733,6 +762,8 @@ function renderActionBar() {
     h("div", { class: "ab-name" }, monoEl(sel.champ), h("span", { text: sel.champ }), h("span", { class: "ab-hint", text: `in ${lab(cur)} · pick a tier or tap a row` })),
     h("div", { class: "ab-tiers" }, TIERS.map(({ k }) => h("button", { type: "button", style: tierVar(k), disabled: k === cur ? true : null, "aria-label": `Move to ${lab(k)}`, text: lab(k),
       onclick: () => { S.sel = null; moveChamp(sel.pid, sel.champ, k); render(); } }))),
+    S.owner ? h("button", { class: "btn ab-prac", type: "button", "aria-pressed": isPractice(p, sel.champ) ? "true" : "false",
+      onclick: () => togglePractice(sel.pid, sel.champ) }, pracEl(), isPractice(p, sel.champ) ? " Practicing" : " Practice") : null,
     h("button", { class: "btn danger", type: "button", text: "Remove", onclick: () => { S.sel = null; removeChamp(sel.pid, sel.champ); render(); } }),
     h("button", { class: "btn ghost", type: "button", text: "Done", onclick: () => { S.sel = null; render(); } })));
 }
@@ -837,7 +868,7 @@ async function clearHistory(pid) {
 }
 async function resetBoards(pids, alsoHistory) {
   return runOwnerOp(pids.length > 1 ? "Resetting all boards" : "Resetting board", async (prog) => {
-    for (const pid of pids) await updateDoc(doc(S.db, "players", pid), { tiers: { S: [], A: [], B: [], C: [], D: [] }, updatedAt: Date.now(), updatedBy: S.myId });
+    for (const pid of pids) await updateDoc(doc(S.db, "players", pid), { tiers: { S: [], A: [], B: [], C: [], D: [] }, practice: [], updatedAt: Date.now(), updatedBy: S.myId });
     let n = 0;
     if (alsoHistory) {
       const all = pids.length === S.order.length;
@@ -965,7 +996,12 @@ document.addEventListener("keydown", (e) => {
   if (!$("overlay").hidden) { closeOverlay(); return; }
   if (S.sel) { S.sel = null; render(); }
 });
-document.addEventListener("click", (e) => { if (S.sel && !e.target.closest(".zone, .chip, .actionbar, .overlay, .toast")) { S.sel = null; render(); } });
+// Uses the click's original path, because a live update can replace the clicked element before this runs.
+document.addEventListener("click", (e) => {
+  if (!S.sel) return;
+  const inside = e.composedPath().some(n => n instanceof Element && n.matches(".zone, .chip, .actionbar, .overlay, .toast"));
+  if (!inside) { S.sel = null; render(); }
+});
 setInterval(() => { document.querySelectorAll(".hist-list time").forEach(t => { t.textContent = rel(Date.parse(t.getAttribute("datetime"))); }); }, 60000);
 
 /* ---------- PDF export ---------- */
@@ -974,10 +1010,10 @@ function loadExportPrefs() {
   const saved = Array.isArray(pr.order) ? pr.order.filter(id => S.players.has(id)) : [];
   const order = saved.concat(S.order.filter(id => !saved.includes(id)));
   const off = new Set(Array.isArray(pr.off) ? pr.off : []);
-  return { rows: order.map(id => ({ id, on: !off.has(id) })), perPage: !!pr.perPage, paper: pr.paper === "a4" ? "a4" : "letter" };
+  return { rows: order.map(id => ({ id, on: !off.has(id) })), perPage: !!pr.perPage, paper: pr.paper === "a4" ? "a4" : "letter", chips: pr.chips === "names" ? "names" : "both" };
 }
 function saveExportPrefs(st) {
-  store("cb-export", JSON.stringify({ order: st.rows.map(r => r.id), off: st.rows.filter(r => !r.on).map(r => r.id), perPage: st.perPage, paper: st.paper }));
+  store("cb-export", JSON.stringify({ order: st.rows.map(r => r.id), off: st.rows.filter(r => !r.on).map(r => r.id), perPage: st.perPage, paper: st.paper, chips: st.chips }));
 }
 function openExportDialog() {
   if (!S.order.length) return;
@@ -1010,6 +1046,9 @@ function openExportDialog() {
     h("fieldset", {}, h("legend", { text: "Layout" }),
       radio("ex-layout", "flow", "Continuous", !st.perPage, () => { st.perPage = false; }),
       radio("ex-layout", "page", "One player per page", st.perPage, () => { st.perPage = true; })),
+    h("fieldset", {}, h("legend", { text: "Champions" }),
+      radio("ex-chips", "both", "Initial badge + name", st.chips !== "names", () => { st.chips = "both"; }),
+      radio("ex-chips", "names", "Names only", st.chips === "names", () => { st.chips = "names"; })),
     h("fieldset", {}, h("legend", { text: "Paper" }),
       radio("ex-paper", "letter", "US Letter", st.paper === "letter", () => { st.paper = "letter"; }),
       radio("ex-paper", "a4", "A4", st.paper === "a4", () => { st.paper = "a4"; })));
@@ -1065,6 +1104,7 @@ async function buildPdf(ids, opts) {
   const doc = new jsPDF({ unit: "pt", format: opts.paper || "letter" });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40, BOTTOM = H - M - 14;
   const INK = [19, 26, 39], MUTED = [90, 100, 119], LINE = [211, 217, 227];
+  const namesOnly = opts.chips === "names";
   const LABEL_W = 56, CH = 20, GAP = 5, AREA_X = M + LABEL_W + 8, AREA_W = W - 2 * M - LABEL_W - 16;
   const dateStr = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   let y = M;
@@ -1075,20 +1115,26 @@ async function buildPdf(ids, opts) {
     else { font("bold", 10, MUTED); doc.text("Comfort Board", M, y + 8); font("normal", 8.5, MUTED); doc.text(dateStr, W - M, y + 8, { align: "right" }); y += 22; }
   };
   const newPage = () => { doc.addPage(); y = M; pageHeader(false); };
+  let prac = new Set();
+  const ACC = [168, 123, 34];
+  const pracMark = (cx, cy) => { doc.setDrawColor(...ACC); doc.setLineWidth(1.1); doc.circle(cx, cy, 4, "S"); doc.setFillColor(...ACC); doc.circle(cx, cy, 1.5, "F"); doc.setLineWidth(0.6); };
   const layoutChips = (champs) => {
     font("normal", 9.5, INK);
     const lines = [[]]; let x = 0;
     for (const c of champs) {
-      const w = Math.min(22 + doc.getTextWidth(pdfText(c)) + 8, AREA_W);
+      const w = Math.min((namesOnly ? 8 : 22) + doc.getTextWidth(pdfText(c)) + 8 + (prac.has(c) ? 12 : 0), AREA_W);
       if (x > 0 && x + w > AREA_W) { lines.push([]); x = 0; }
       lines[lines.length - 1].push({ c, x, w }); x += w + GAP;
     }
     return lines;
   };
   pageHeader(true);
+  if (ids.some(id => practiceCount(S.players.get(id)))) {
+    pracMark(M + 4, y + 2); font("normal", 9, MUTED); doc.text("Marked for practice", M + 13, y + 5); y += 18;
+  }
   ids.forEach((pid, idx) => {
     const p = S.players.get(pid); if (!p) return;
-    const t = tiersOf(p);
+    const t = tiersOf(p); prac = new Set(p.practice || []);
     const rows = TIERS.map(({ k }) => {
       const lines = t[k].length ? layoutChips(t[k]) : null;
       return { k, lines, hgt: Math.max(44, (lines ? lines.length : 1) * (CH + GAP) - GAP + 16) };
@@ -1118,10 +1164,13 @@ async function buildPdf(ids, opts) {
         for (const ln of r.lines) {
           for (const it of ln) {
             const x0 = AREA_X + it.x;
-            doc.setDrawColor(...LINE); doc.setFillColor(255, 255, 255); doc.roundedRect(x0, ly, it.w, CH, 3, 3, "FD");
+            const pr = prac.has(it.c), extra = pr ? 12 : 0;
+            doc.setDrawColor(...(pr ? ACC : LINE)); doc.setFillColor(255, 255, 255); doc.roundedRect(x0, ly, it.w, CH, 3, 3, "FD");
+            if (pr) pracMark(x0 + it.w - 10, ly + CH / 2);
+            if (namesOnly) { font("normal", 9.5, INK); doc.text(fit(it.c, it.w - 16 - extra), x0 + 8, ly + 13.6); continue; }
             doc.setFillColor(...hslRgb(hue(it.c), 45, 42)); doc.roundedRect(x0 + 3, ly + 3, 14, 14, 2, 2, "F");
             font("bold", 6.5, [255, 255, 255]); doc.text(pdfText(initials(it.c)), x0 + 10, ly + 12.4, { align: "center" });
-            font("normal", 9.5, INK); doc.text(fit(it.c, it.w - 30), x0 + 22, ly + 13.6);
+            font("normal", 9.5, INK); doc.text(fit(it.c, it.w - 30 - extra), x0 + 22, ly + 13.6);
           }
           ly += CH + GAP;
         }
