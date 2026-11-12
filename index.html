@@ -54,6 +54,18 @@ button { cursor: pointer; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status.live .dot { background: var(--up-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up-ink) 25%, transparent); }
 .status.warn .dot { background: var(--down-ink); }
+.status.lock .dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.playoff-lock { padding: 36px 24px; display: grid; gap: 14px; justify-items: start; }
+.playoff-lock h2 { font-family: var(--f-display); font-weight: 700; font-size: 32px; margin: 0; text-transform: uppercase; letter-spacing: .02em; }
+.playoff-lock p { margin: 0; color: var(--muted); max-width: 56ch; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.switch { display: inline-flex; align-items: center; gap: 12px; border: 0; background: transparent; padding: 4px 0; font-weight: 600; text-align: left; }
+.switch .track { width: 46px; height: 26px; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; flex: none; }
+.switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+.switch[aria-checked="true"] .track { background: var(--accent); }
+.switch[aria-checked="true"] .track::after { transform: translateX(20px); }
+.switch:disabled { opacity: .6; cursor: default; }
+#playoffSec.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .who-me { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .who-me b { color: var(--ink); font-weight: 600; }
 
@@ -343,13 +355,15 @@ const ROLE_BY_NORM = Object.fromEntries(Object.entries(CHAMP_ROLES).map(([n, r])
 const rolesOf = (champ) => ROLE_BY_NORM[champ.toLowerCase().replace(/[^a-z0-9]/g, "")] || [];
 
 const S = {
-  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null, display: { team: "both", player: "both" }, pick: { q: "", role: "All", open: true },
+  db: null, auth: null, myId: null, myName: "", editor: false, owner: false, tierCfg: {}, busy: null, display: { team: "both", player: "both" }, playoff: false, accessKnown: false, pick: { q: "", role: "All", open: true },
   configMissing: false, error: null, loaded: false, stalled: false, gotPlayers: false,
   players: new Map(), order: [], moves: [],
   view: null, sel: null, drag: null, histScope: "player", addTier: "B",
 };
 let built = null;
 let unsubs = [];
+let accessUnsub = null;
+let dataOn = false;
 const $ = (id) => document.getElementById(id);
 
 /* ---------- helpers ---------- */
@@ -415,7 +429,7 @@ function enqueue(fn) { chain = chain.then(fn).catch(onWriteError); return chain;
 function onWriteError(e) {
   console.error(e);
   if (e && e.code === "permission-denied") {
-    S.editor = false; S.owner = false; built = null; S.sel = null; if (S.view === "settings") S.view = "team"; render();
+    S.editor = false; S.owner = false; built = null; S.sel = null; if (S.view === "settings") S.view = "team"; syncAccess();
     toast("Editing access was refused. The passcode may have changed, so unlock again.");
   } else toast("That change didn't save. Check your connection and try again.");
 }
@@ -491,6 +505,7 @@ function render() { renderStatus(); renderMe(); renderRoster(); renderNotice(); 
 function renderStatus() {
   const el = $("status"), tx = $("statusText"); el.className = "status";
   if (S.configMissing) { el.classList.add("warn"); tx.textContent = "Not set up"; }
+  else if (S.playoff && S.myId) { el.classList.add("lock"); tx.textContent = "Playoff mode"; }
   else if (S.error) { el.classList.add("warn"); tx.textContent = "Connection lost"; }
   else if (S.stalled) { el.classList.add("warn"); tx.textContent = "Can't reach the board yet"; }
   else if (S.loaded) { el.classList.add("live"); tx.textContent = "Live"; }
@@ -514,9 +529,10 @@ function renderNotice() {
   const n = $("notice"); n.replaceChildren();
   let msg = "", action = null;
   if (S.error) msg = S.error.code === "permission-denied" ? "The database refused to load. Check that the security rules from firestore.rules are published." : "The connection to the board dropped. Reload the page to reconnect.";
+  else if (S.playoff && canEdit()) { msg = "Playoff mode is on. Only people with the team or owner passcode can see the board."; action = S.owner && S.view !== "settings" ? h("button", { class: "btn small", type: "button", text: "Owner settings", onclick: () => go("settings") }) : null; }
   else if (S.stalled && S.gotPlayers) msg = "Showing the last saved copy. It may be out of date until the connection comes back.";
   else if (!S.configMissing && S.myId && !canEdit() && S.gotPlayers) { msg = "View only. Enter the team passcode to add players and move champions."; action = h("button", { class: "btn primary small", type: "button", text: "Unlock editing", onclick: () => openUnlockDialog("editor") }); }
-  n.hidden = !msg; if (msg) n.append(h("span", { text: msg }), action);
+  n.hidden = !msg; if (msg) { n.append(h("span", { text: msg })); if (action) n.append(action); }
 }
 function renderRoster() {
   const r = $("roster"); r.replaceChildren();
@@ -544,6 +560,15 @@ function renderMain() {
     if (built !== "setup") { built = "setup"; m.className = "main";
       m.replaceChildren(h("section", { class: "panel empty-state" }, h("h2", { text: "Connect Firebase" }),
         h("p", {}, "This page doesn't have a Firebase project yet. Open ", h("code", { text: "index.html" }), ", paste your web app config into ", h("code", { text: "FIREBASE_CONFIG" }), " near the top of the script, and reload."))); }
+    return;
+  }
+  if (S.playoff && !canEdit()) {
+    if (built !== "playoff") { built = "playoff"; m.className = "main";
+      m.replaceChildren(h("section", { class: "panel playoff-lock" }, h("span", { class: "eyebrow", text: "Board hidden" }), h("h2", { text: "Playoff mode" }),
+        h("p", { text: "The team's tiers and history are hidden for now. Enter the team or owner passcode to see the board." }),
+        h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" },
+          h("button", { class: "btn primary", type: "button", text: "Unlock with team passcode", onclick: () => openUnlockDialog("editor") }),
+          h("button", { class: "btn", type: "button", text: "Owner", onclick: () => openUnlockDialog("owner") })))); }
     return;
   }
   if (!S.gotPlayers) { built = "loading"; m.className = "main"; m.replaceChildren(h("div", { class: "panel loading", text: S.stalled ? "Can't reach the saved board yet. It will load as soon as the connection answers." : "Loading the board…" })); return; }
@@ -826,7 +851,7 @@ function openUnlockDialog(mode) {
       const body = owner ? { ownerCode: code, name, joinedAt: Date.now() } : { code, name, joinedAt: Date.now() };
       await setDoc(doc(S.db, "members", S.myId), body);
       if (owner) { S.owner = true; S.editor = true; S.view = "settings"; } else { S.editor = true; S.owner = false; }
-      S.myName = name; store("cb-name", name); built = null; closeOverlay(); render();
+      S.myName = name; store("cb-name", name); built = null; closeOverlay(); syncAccess();
       toast(owner ? "Owner settings unlocked on this device." : "Editing unlocked on this device.");
     } catch (x) {
       err.textContent = x && x.code === "permission-denied" ? `That ${owner ? "owner " : ""}passcode didn't work.` : "Couldn't reach the board to check the passcode. Try again.";
@@ -942,6 +967,14 @@ function renderSettings(m) {
     tierSec = sec;
   }
 
+  // 0. Playoff mode
+  const po = h("section", { id: "playoffSec", class: "panel set-sec" + (S.playoff ? " on" : "") }, h("h2", { text: "Playoff mode" }),
+    h("p", { text: "Hides every player, tier and history entry from anyone who hasn't entered the team or owner passcode. Viewers see a locked screen until you turn it off." }),
+    h("button", { class: "switch", type: "button", role: "switch", id: "po-switch", "aria-checked": S.playoff ? "true" : "false",
+      onclick: async (e) => { const btn = e.currentTarget; btn.disabled = true; await setPlayoff(!S.playoff); btn.disabled = false; } },
+      h("span", { class: "track", "aria-hidden": "true" }), h("span", { text: S.playoff ? "On: board hidden from viewers" : "Off: anyone with the link can view" })));
+  { const old = $("playoffSec"); if (old) old.replaceWith(po); else wrap.prepend(po); }
+
   // 2. Reset boards
   const alsoHist = $("rb-hist") ? $("rb-hist").checked : true;
   const resetList = h("div", { class: "reset-list" });
@@ -986,7 +1019,7 @@ function renderSettings(m) {
 
 async function lockDevice() {
   S.editor = false; S.owner = false; S.sel = null; built = null; if (S.view === "settings") S.view = "team"; render();
-  stopListeners();
+  stopListeners(); stopAccessWatch();
   try { await signOut(S.auth); } catch (e) {}
   toast("Editing locked on this device.");
 }
@@ -1232,15 +1265,49 @@ async function loadChampionIcons() {
 }
 
 /* ---------- boot ---------- */
-function stopListeners() { unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = []; }
+function stopListeners() { unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = []; dataOn = false; }
+function stopAccessWatch() { if (accessUnsub) { try { accessUnsub(); } catch (e) {} accessUnsub = null; } S.accessKnown = false; }
+function clearBoardData() {
+  S.players = new Map(); S.order = []; S.moves = []; S.tierCfg = {};
+  S.gotPlayers = false; S.loaded = false; S.stalled = false; S.error = null; S.sel = null; built = null;
+}
+// Playoff mode: data listeners run only for people allowed to see the board. The database rules enforce the same thing.
+function syncAccess() {
+  if (!S.accessKnown) { render(); return; }
+  const ok = !S.playoff || canEdit();
+  if (ok && !dataOn) startListeners();
+  else if (!ok && dataOn) { stopListeners(); clearBoardData(); }
+  render();
+}
+function watchAccess() {
+  stopAccessWatch();
+  accessUnsub = onSnapshot(doc(S.db, "settings", "access"), (snap) => {
+    const on = snap.exists() && snap.data().playoff === true;
+    const changed = on !== S.playoff;
+    S.playoff = on; S.accessKnown = true;
+    if (changed && on && !canEdit()) toast("Playoff mode is on. The board is hidden.");
+    syncAccess();
+  }, (err) => { console.error(err); S.playoff = false; S.accessKnown = true; syncAccess(); });
+}
+async function setPlayoff(on) {
+  if (!S.owner) return;
+  try { await setDoc(doc(S.db, "settings", "access"), { playoff: on, updatedAt: Date.now(), updatedBy: S.myId });
+    toast(on ? "Playoff mode on. The board is hidden from anyone without a passcode." : "Playoff mode off. Everyone with the link can view the board again."); }
+  catch (e) { onWriteError(e); }
+}
 function startListeners() {
-  stopListeners();
+  stopListeners(); dataOn = true;
   const timer = setTimeout(() => { if (!S.loaded) { S.stalled = true; render(); } }, 10000);
   unsubs.push(onSnapshot(query(collection(S.db, "players"), orderBy("createdAt")), { includeMetadataChanges: true }, (snap) => {
     S.players = new Map(snap.docs.map(d => [d.id, d.data()])); S.order = snap.docs.map(d => d.id); S.gotPlayers = true;
     if (!snap.metadata.fromCache) { clearTimeout(timer); S.loaded = true; S.stalled = false; }
     render();
-  }, (err) => { clearTimeout(timer); S.error = err; S.gotPlayers = true; render(); }));
+  }, (err) => {
+    clearTimeout(timer);
+    // A refusal while playoff mode is switching on is expected; the access watcher hides the board.
+    if (err && err.code === "permission-denied" && S.playoff) return;
+    S.error = err; S.gotPlayers = true; render();
+  }));
   unsubs.push(onSnapshot(doc(S.db, "settings", "board"), (snap) => {
     S.tierCfg = (snap.exists() && snap.data().tiers) || {}; render();
   }, (err) => console.error(err)));
@@ -1265,7 +1332,7 @@ function boot() {
       const m = await getDoc(doc(S.db, "members", u.uid));
       if (m.exists()) { const md = m.data(); S.editor = "code" in md; S.owner = "ownerCode" in md; S.myName = md.name || ""; }
     } catch (e) {}
-    built = null; startListeners(); render();
+    built = null; watchAccess(); render();
   });
 }
 boot();
